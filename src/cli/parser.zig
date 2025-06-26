@@ -17,26 +17,53 @@ pub const Parser = struct {
 
     arguments: []Argument,
 
-
     pub fn parse(self: *const Parser, allocator: Allocator, args: [][*:0]u8) ![]const u8 {
         if (args.len == 1 and self.arguments.len != 0) {
             return self.help(allocator);
         }
 
-        var option: ?[]const u8 = null;
+        var option: ?*Argument = null;
 
         for (args[1..]) |arg| {
             const arg_slice = std.mem.span(arg);
 
             if (std.mem.startsWith(u8, arg_slice, "--")) {
                 std.debug.print("[DBG][cli:parser] Found long option: {s}\n", .{arg});
-                option = arg_slice[2..];
+                const option_name = arg_slice[2..];
+                for (self.arguments, 0..) |_, i| {
+                    var arg_data = &self.arguments[i];
+
+                    if (arg_data.option == null) continue;
+
+                    if (std.mem.eql(u8, arg_data.option.?[2..], option_name)) {
+                        std.debug.print("[DBG][cli:parser] Matched argument: {s}\n", .{arg_data.option.?});
+                        option = arg_data;
+                        break;
+                    }
+                }
             } else if (std.mem.startsWith(u8, arg_slice, "-")) {
                 std.debug.print("[DBG][cli:parser] Found short option: {s}\n", .{arg});
-                option = arg_slice[1..];
+                const option_name = arg_slice[1..];
+
+                for (self.arguments, 0..) |_, i| {
+                    var arg_data = &self.arguments[i];
+
+                    if (arg_data.flag == null) continue;
+
+                    if (std.mem.eql(u8, arg_data.flag.?[1..], option_name)) {
+                        std.debug.print("[DBG][cli:parser] Matched argument: {s}\n", .{arg_data.flag.?});
+                        option = arg_data;
+                        break;
+                    }
+                }
             } else {
                 if (option != null) {
-                    std.debug.print("[DBG][cli:parser] Found named argument: {s} with value: {s}\n", .{option.?, arg});
+                    std.debug.print("[DBG][cli:parser] Found named argument: {s} with value: {s}\n", .{ option.?.name, arg });
+
+                    const value_slice = std.mem.span(arg);
+                    option.?.value = value_slice;
+
+                    option = null;
                 } else {
                     std.debug.print("[DBG][cli:parser] Found positional argument: {s}\n", .{arg});
                 }
