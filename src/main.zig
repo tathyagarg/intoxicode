@@ -2,28 +2,36 @@ const std = @import("std");
 const cli = @import("cli/cli.zig");
 
 pub fn main() !void {
-    var arguments = [_]cli.Argument{.{
-        .name = "input",
-        .description = "The input file to run",
-        .required = true,
-        .option = "--input",
-    }};
+    const allocator = std.heap.page_allocator;
 
-    const parser = cli.Parser{
-        .name = "intoxicode",
-        .description = "A CLI tool to run intoxicode code",
+    var parser = cli.Parser.init("my_program", "A simple CLI program", std.heap.page_allocator);
 
-        .arguments = &arguments,
+    try parser.add_argument(@constCast(&cli.Argument{
+        .name = "output",
+        .description = "The output file to write to",
+        .option = "--out",
+        .flag = "-O",
+        .positional = true,
+    }));
+
+    try parser.add_argument(@constCast(&cli.Argument{
+        .name = "verbose",
+        .description = "Enable verbose output",
+        .option = "--verbose",
+        .flag = "-v",
+        .has_data = false,
+    }));
+
+    defer parser.deinit();
+
+    parser.parse(std.os.argv) catch {
+        const message = try parser.help(allocator);
+        std.debug.print("{s}\n", .{message});
+
+        return;
     };
 
-    const allocator = std.heap.page_allocator;
-    _ = try parser.parse(allocator, std.os.argv);
-
-    for (parser.arguments) |arg| {
-        if (arg.value) |value| {
-            std.debug.print("[DBG][main] Argument {s} has value: {s}\n", .{ arg.name, value });
-        } else {
-            std.debug.print("[DBG][main] Argument {s} has no value\n", .{arg.name});
-        }
-    }
+    std.debug.print("Parsed arguments successfully.\n", .{});
+    std.debug.print("Output file: {s}\n", .{parser.arguments.get("output").?.value orelse "not specified"});
+    std.debug.print("Verbose mode: {s}\n", .{parser.arguments.get("verbose").?.value orelse "off"});
 }

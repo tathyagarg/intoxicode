@@ -2,6 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 
 const Argument = @import("argument.zig").Argument;
+const CliError = @import("../errors.zig").CliError;
 
 const help_text: []const u8 =
     \\{[bold]s}NAME{[reset]s}
@@ -15,11 +16,36 @@ pub const Parser = struct {
     name: []const u8,
     description: ?[]const u8 = null,
 
-    arguments: []Argument,
+    arguments: std.StringHashMap(*Argument),
 
-    pub fn parse(self: *const Parser, allocator: Allocator, args: [][*:0]u8) ![]const u8 {
-        if (args.len == 1 and self.arguments.len != 0) {
-            return self.help(allocator);
+    pub fn init(
+        name: []const u8,
+        description: ?[]const u8,
+        allocator: Allocator,
+    ) Parser {
+        return Parser{
+            .name = name,
+            .description = description,
+            .arguments = std.StringHashMap(*Argument).init(allocator),
+        };
+    }
+
+    pub fn deinit(self: *Parser) void {
+        self.arguments.deinit();
+    }
+
+    pub fn add_argument(
+        self: *Parser,
+        arg: *Argument,
+    ) !void {
+        self.arguments.put(arg.name, arg) catch |err| {
+            return err;
+        };
+    }
+
+    pub fn parse(self: *const Parser, args: [][*:0]u8) !void {
+        if (args.len == 1 and self.arguments.count() != 0) {
+            return CliError.InvalidArgumentList;
         }
 
         var option: ?*Argument = null;
@@ -28,49 +54,46 @@ pub const Parser = struct {
             const arg_slice = std.mem.span(arg);
 
             if (std.mem.startsWith(u8, arg_slice, "--")) {
-                std.debug.print("[DBG][cli:parser] Found long option: {s}\n", .{arg});
-                const option_name = arg_slice[2..];
-                for (self.arguments, 0..) |_, i| {
-                    var arg_data = &self.arguments[i];
-
-                    if (arg_data.option == null) continue;
-
-                    if (std.mem.eql(u8, arg_data.option.?[2..], option_name)) {
-                        std.debug.print("[DBG][cli:parser] Matched argument: {s}\n", .{arg_data.option.?});
-                        option = arg_data;
+                var iterator = self.arguments.iterator();
+                while (iterator.next()) |entry| {
+                    const object_option = entry.value_ptr.*.option orelse "";
+                    if (std.mem.eql(u8, object_option, arg_slice)) {
+                        option = entry.value_ptr.*;
                         break;
                     }
                 }
             } else if (std.mem.startsWith(u8, arg_slice, "-")) {
-                std.debug.print("[DBG][cli:parser] Found short option: {s}\n", .{arg});
-                const option_name = arg_slice[1..];
-
-                for (self.arguments, 0..) |_, i| {
-                    var arg_data = &self.arguments[i];
-
-                    if (arg_data.flag == null) continue;
-
-                    if (std.mem.eql(u8, arg_data.flag.?[1..], option_name)) {
-                        std.debug.print("[DBG][cli:parser] Matched argument: {s}\n", .{arg_data.flag.?});
-                        option = arg_data;
+                var iterator = self.arguments.iterator();
+                while (iterator.next()) |entry| {
+                    const object_flag = entry.value_ptr.*.flag orelse "";
+                    if (std.mem.eql(u8, object_flag, arg_slice)) {
+                        if (entry.value_ptr.*.has_data) {
+                            option = entry.value_ptr.*;
+                        } else {
+                            entry.value_ptr.*.value = ("on");
+                        }
                         break;
                     }
                 }
             } else {
                 if (option != null) {
-                    std.debug.print("[DBG][cli:parser] Found named argument: {s} with value: {s}\n", .{ option.?.name, arg });
-
                     const value_slice = std.mem.span(arg);
                     option.?.value = value_slice;
 
                     option = null;
                 } else {
-                    std.debug.print("[DBG][cli:parser] Found positional argument: {s}\n", .{arg});
+                    var iterator = self.arguments.iterator();
+                    while (iterator.next()) |entry| {
+                        if (entry.value_ptr.*.positional and entry.value_ptr.*.value == null) {
+                            entry.value_ptr.*.value = std.mem.span(arg);
+                            break;
+                        }
+                    }
                 }
             }
         }
 
-        return "";
+        return;
     }
 
     pub fn help(self: *const Parser, allocator: Allocator) ![]const u8 {
@@ -87,14 +110,8 @@ pub const Parser = struct {
 
         return message;
     }
+
+    pub fn get(self: *const Parser, name: []const u8) ?*Argument {
+        return self.arguments.get(name);
+    }
 };
-
-test "cli.parser.help" {
-    const parser = Parser{
-        .name = "test",
-        .description = "This is a test parser.",
-        .arguments = &.{},
-    };
-
-    try parser.help();
-}
