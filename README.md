@@ -2,7 +2,7 @@
 Run code like you're drunk!
 
 ## Features
-1. Statements ending with `.` are certain, `?` are uncertain, and `!` are very certain.
+1. Statements ending with `.` are certain, `?` are uncertain.
 2. There's a 10% chance for each character in a string literal to switch case.
 3. Variable names must include vowels, it's too hard to pronounce otherwise.
 4. Operations can be performed with `+`, `-`, `*`, `/`, and `%` operators, but reliable answers are not guaranteed.

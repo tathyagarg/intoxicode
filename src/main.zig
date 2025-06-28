@@ -1,5 +1,6 @@
 const std = @import("std");
 const cli = @import("cli/cli.zig");
+const runtime = @import("runtime/runtime.zig");
 
 pub fn main() !void {
     const allocator = std.heap.page_allocator;
@@ -31,7 +32,10 @@ pub fn main() !void {
         return;
     };
 
-    std.debug.print("Parsed arguments successfully.\n", .{});
-    std.debug.print("Input file: {s}\n", .{parser.arguments.get("file").?.value orelse "none"});
-    std.debug.print("Verbose mode: {s}\n", .{parser.arguments.get("verbose").?.value orelse "off"});
+    const file_path = parser.get("file") orelse {
+        std.debug.print("No file specified.\n", .{});
+        return;
+    };
+
+    _ = try runtime.loader.load_file(allocator, file_path.value.?);
 }
