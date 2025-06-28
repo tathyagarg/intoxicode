@@ -97,6 +97,8 @@ pub const Lexer = struct {
             '<' => try self.add_token(TokenType.LessThan),
             '>' => try self.add_token(TokenType.GreaterThan),
             '=' => try self.add_token(TokenType.Equal),
+            '.' => try self.add_token(TokenType.Period),
+            '?' => try self.add_token(TokenType.QuestionMark),
             'a'...'z', 'A'...'Z', '_' => {
                 while (!self.at_end() and (self.current_char >= 'a' and self.current_char <= 'z' or
                     self.current_char >= 'A' and self.current_char <= 'Z' or
@@ -115,8 +117,39 @@ pub const Lexer = struct {
 
                 try self.add_token(token_type);
             },
-            ';' => self.advance(),
+            '"' => {
+                self.advance(); // Consume the opening quote
+
+                while (!self.at_end() and self.current_char != '"') self.advance();
+
+                if (self.current_char != '"') {
+                    return error.UnterminatedString; // Unterminated string literal
+                }
+
+                self.advance(); // Consume the closing quote
+                try self.add_token(TokenType.String);
+            },
+            ';' => {
+                try self.add_token(TokenType.Semicolon);
+                self.advance();
+            },
             ' ' => {},
+            '0'...'9' => {
+                while (!self.at_end() and self.current_char >= '0' and self.current_char <= '9' and self.peek() != ';' and self.peek() != ' ') {
+                    self.advance();
+                }
+
+                if (self.current_char == '.' and (self.peek() >= '0' and self.peek() <= '9')) {
+                    self.advance(); // Consume the '.'
+                    while (!self.at_end() and self.current_char >= '0' and self.current_char <= '9' and self.peek() != ';' and self.peek() != ' ') {
+                        self.advance();
+                    }
+                    try self.add_token(TokenType.Float);
+                } else {
+                    // Integer literal
+                    try self.add_token(TokenType.Integer);
+                }
+            },
             else => unreachable,
         }
     }
@@ -126,7 +159,7 @@ pub const Lexer = struct {
     }
 
     pub fn get_actual_line(self: *Lexer) usize {
-        return if (self.start_position > self.position)
+        return if (self.start_position >= self.position)
             self.line_number - 1
         else
             self.line_number;
@@ -135,7 +168,7 @@ pub const Lexer = struct {
     pub fn get_value(self: *Lexer) []const u8 {
         const line_number = self.get_actual_line();
 
-        const end_index = if (self.start_position > self.position) self.input.items[line_number].len else self.position;
+        const end_index = if (self.start_position >= self.position) self.input.items[line_number].len else self.position;
         return self.input.items[line_number][self.start_position..end_index];
     }
 

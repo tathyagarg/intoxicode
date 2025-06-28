@@ -49,6 +49,7 @@ pub const TokenType = enum {
     Or,
     Not,
 
+    Semicolon,
     EOF,
 };
 

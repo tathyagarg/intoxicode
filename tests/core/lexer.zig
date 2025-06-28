@@ -87,8 +87,7 @@ test "core.lexer.scan_tokens_identifier" {
     var input = std.ArrayList([]const u8).init(std.testing.allocator);
     defer input.deinit();
 
-    try input.append("identifier123;");
-    try input.append("another__ThingY;");
+    try input.append("identifier123 another__ThingY");
 
     var lex = lexer.Lexer.init(input);
     defer lex.deinit();
@@ -158,4 +157,61 @@ test "core.lexer.all_kws" {
         try std.testing.expect(lex.tokens.items[i].token_type == token_types[i]);
         try std.testing.expect(std.mem.eql(u8, lex.tokens.items[i].value, keyword));
     }
+}
+
+test "core.lexer.scan_tokens_string" {
+    var input = std.ArrayList([]const u8).init(std.testing.allocator);
+    defer input.deinit();
+
+    try input.append("\"Hello, world!\"");
+
+    var lex = lexer.Lexer.init(input);
+    defer lex.deinit();
+
+    try lex.scan_tokens();
+
+    try std.testing.expect(lex.tokens.items.len == 2);
+
+    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.String);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "\"Hello, world!\""));
+}
+
+test "core.lexer.scan_tokens_float" {
+    var input = std.ArrayList([]const u8).init(std.testing.allocator);
+    defer input.deinit();
+
+    try input.append("3.14 2.718");
+
+    var lex = lexer.Lexer.init(input);
+    defer lex.deinit();
+
+    try lex.scan_tokens();
+
+    try std.testing.expect(lex.tokens.items.len == 3);
+
+    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.Float);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "3.14"));
+
+    try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.Float);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "2.718"));
+}
+
+test "core.lexer.scan_tokens_integer" {
+    var input = std.ArrayList([]const u8).init(std.testing.allocator);
+    defer input.deinit();
+
+    try input.append("42 1000");
+
+    var lex = lexer.Lexer.init(input);
+    defer lex.deinit();
+
+    try lex.scan_tokens();
+
+    try std.testing.expect(lex.tokens.items.len == 3);
+
+    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.Integer);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "42"));
+
+    try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.Integer);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "1000"));
 }
