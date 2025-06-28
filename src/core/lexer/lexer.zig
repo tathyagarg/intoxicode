@@ -56,6 +56,18 @@ pub const Lexer = struct {
             '<' => try self.add_token(TokenType.LessThan),
             '>' => try self.add_token(TokenType.GreaterThan),
             '=' => try self.add_token(TokenType.Equal),
+            'a'...'z', 'A'...'Z', '_' => {
+                while (!self.at_end() and (self.current_char >= 'a' and self.current_char <= 'z' or
+                    self.current_char >= 'A' and self.current_char <= 'Z' or
+                    self.current_char >= '0' and self.current_char <= '9' or
+                    self.current_char == '_') and self.peek() != ';')
+                {
+                    self.advance();
+                }
+
+                try self.add_token(TokenType.Identifier);
+            },
+            ';' => self.advance(),
             else => unreachable,
         }
     }
@@ -67,7 +79,7 @@ pub const Lexer = struct {
     pub fn add_token(self: *Lexer, token_type: TokenType) !void {
         const line_number = if (self.start_position > self.position) self.line_number - 1 else self.line_number;
 
-        const end_index = if (self.start_position >= self.position) self.input.items[line_number].len else self.position;
+        const end_index = if (self.start_position > self.position) self.input.items[line_number].len else self.position;
         const value = self.input.items[line_number][self.start_position..end_index];
 
         const token = Token.init(token_type, value, line_number);
@@ -81,10 +93,43 @@ pub const Lexer = struct {
         return self.line_number + 1 >= self.input.items.len and self.position >= self.input.items[self.line_number].len;
     }
 
+    pub fn peek(self: *Lexer) u8 {
+        if (self.at_end()) return 0;
+
+        if (self.position >= self.input.items[self.line_number].len) {
+            return 0; // No next character
+        }
+
+        return self.input.items[self.line_number][self.position];
+    }
+
+    pub fn peek_next(self: *Lexer) u8 {
+        if (self.at_end()) return 0;
+
+        if (self.position + 1 >= self.input.items[self.line_number].len) {
+            return 0; // No next character
+        }
+
+        return self.input.items[self.line_number][self.position + 1];
+    }
+
     pub fn advance(self: *Lexer) void {
+        const overflow = self.position >= self.input.items[self.line_number].len;
+
+        if (overflow) {
+            self.line_number += 1;
+            self.position = 0;
+        }
+
+        if (self.line_number >= self.input.items.len) {
+            self.current_char = 0; // End of input
+            return;
+        }
         self.current_char = self.input.items[self.line_number][self.position];
 
-        self.next_position();
+        if (!overflow) {
+            self.next_position();
+        }
     }
 
     pub fn match(self: *Lexer, expected: u8) bool {
@@ -97,10 +142,5 @@ pub const Lexer = struct {
 
     pub fn next_position(self: *Lexer) void {
         self.position += 1;
-
-        if (self.position >= self.input.items[self.line_number].len) {
-            self.line_number += 1;
-            self.position = 0;
-        }
     }
 };
