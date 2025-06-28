@@ -103,3 +103,59 @@ test "core.lexer.scan_tokens_identifier" {
     try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.Identifier);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "another__ThingY"));
 }
+
+test "core.lexer.keywords" {
+    var input = std.ArrayList([]const u8).init(std.testing.allocator);
+    defer input.deinit();
+
+    try input.append("if else");
+
+    var lex = lexer.Lexer.init(input);
+    defer lex.deinit();
+
+    try lex.scan_tokens();
+
+    try std.testing.expect(lex.tokens.items.len == 3);
+
+    const expected_keywords: [2][]const u8 = [_][]const u8{
+        "if",
+        "else",
+    };
+
+    const token_types: [2]lexer.tokens.TokenType = [_]lexer.tokens.TokenType{
+        .If,
+        .Else,
+    };
+
+    for (expected_keywords, 0..) |keyword, i| {
+        try std.testing.expect(lex.tokens.items[i].token_type == token_types[i]);
+        try std.testing.expect(std.mem.eql(u8, lex.tokens.items[i].value, keyword));
+    }
+}
+
+test "core.lexer.all_kws" {
+    var input = std.ArrayList([]const u8).init(std.testing.allocator);
+    defer input.deinit();
+
+    try input.append("if else loop maybe fun throwaway call try gotcha and or not");
+
+    var lex = lexer.Lexer.init(input);
+    defer lex.deinit();
+
+    try lex.scan_tokens();
+
+    try std.testing.expect(lex.tokens.items.len == 13);
+
+    const expected_keywords: [12][]const u8 = [_][]const u8{
+        "if", "else", "loop", "maybe", "fun", "throwaway", "call", "try", "gotcha", "and", "or", "not",
+    };
+
+    const token_types: [12]lexer.tokens.TokenType = [_]lexer.tokens.TokenType{
+        .If, .Else, .Loop, .Maybe, .Fun, .Throwaway, .Call, .Try, .Gotcha, .And, .Or, .Not,
+    };
+
+    for (expected_keywords, 0..) |keyword, i| {
+        try std.testing.expect(lex.tokens.items[i].token_type == token_types[i]);
+        try std.testing.expect(std.mem.eql(u8, lex.tokens.items[i].value, keyword));
+    }
+}

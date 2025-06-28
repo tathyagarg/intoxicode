@@ -4,6 +4,47 @@ pub const tokens = @import("tokens.zig");
 const Token = tokens.Token;
 const TokenType = tokens.TokenType;
 
+const Pair = struct {
+    key: []const u8,
+    value: TokenType,
+};
+
+pub const Keywords = [_]Pair{
+    .{ .key = "if", .value = TokenType.If },
+    .{ .key = "else", .value = TokenType.Else },
+    .{ .key = "loop", .value = TokenType.Loop },
+    .{ .key = "maybe", .value = TokenType.Maybe },
+    .{ .key = "fun", .value = TokenType.Fun },
+    .{ .key = "throwaway", .value = TokenType.Throwaway },
+    .{ .key = "call", .value = TokenType.Call },
+    .{ .key = "try", .value = TokenType.Try },
+    .{ .key = "gotcha", .value = TokenType.Gotcha },
+    .{ .key = "and", .value = TokenType.And },
+    .{ .key = "or", .value = TokenType.Or },
+    .{ .key = "not", .value = TokenType.Not },
+    .{ .key = "null", .value = TokenType.Null },
+    .{ .key = "true", .value = TokenType.Boolean },
+    .{ .key = "false", .value = TokenType.Boolean },
+};
+
+pub fn is_keyword(token: []const u8) bool {
+    for (Keywords) |pair| {
+        if (std.mem.eql(u8, token, pair.key)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+pub fn get_keyword_type(token: []const u8) ?TokenType {
+    for (Keywords) |pair| {
+        if (std.mem.eql(u8, token, pair.key)) {
+            return pair.value;
+        }
+    }
+    return null;
+}
+
 pub const Lexer = struct {
     input: std.ArrayList([]const u8),
 
@@ -60,14 +101,22 @@ pub const Lexer = struct {
                 while (!self.at_end() and (self.current_char >= 'a' and self.current_char <= 'z' or
                     self.current_char >= 'A' and self.current_char <= 'Z' or
                     self.current_char >= '0' and self.current_char <= '9' or
-                    self.current_char == '_') and self.peek() != ';')
+                    self.current_char == '_') and self.peek() != ';' and self.peek() != ' ')
                 {
                     self.advance();
                 }
 
-                try self.add_token(TokenType.Identifier);
+                var token_type = TokenType.Identifier;
+                const value = self.get_value();
+
+                if (is_keyword(value)) {
+                    token_type = get_keyword_type(value).?;
+                }
+
+                try self.add_token(token_type);
             },
             ';' => self.advance(),
+            ' ' => {},
             else => unreachable,
         }
     }
@@ -76,11 +125,23 @@ pub const Lexer = struct {
         try self.tokens.append(token);
     }
 
-    pub fn add_token(self: *Lexer, token_type: TokenType) !void {
-        const line_number = if (self.start_position > self.position) self.line_number - 1 else self.line_number;
+    pub fn get_actual_line(self: *Lexer) usize {
+        return if (self.start_position > self.position)
+            self.line_number - 1
+        else
+            self.line_number;
+    }
+
+    pub fn get_value(self: *Lexer) []const u8 {
+        const line_number = self.get_actual_line();
 
         const end_index = if (self.start_position > self.position) self.input.items[line_number].len else self.position;
-        const value = self.input.items[line_number][self.start_position..end_index];
+        return self.input.items[line_number][self.start_position..end_index];
+    }
+
+    pub fn add_token(self: *Lexer, token_type: TokenType) !void {
+        const line_number = self.get_actual_line();
+        const value = self.get_value();
 
         const token = Token.init(token_type, value, line_number);
 
