@@ -84,6 +84,7 @@ pub const Lexer = struct {
 
     pub fn scan_token(self: *Lexer) !void {
         self.advance();
+
         switch (self.current_char) {
             '(' => try self.add_token(TokenType.LeftParen),
             ')' => try self.add_token(TokenType.RightParen),
@@ -126,7 +127,6 @@ pub const Lexer = struct {
                     return error.UnterminatedString; // Unterminated string literal
                 }
 
-                self.advance(); // Consume the closing quote
                 try self.add_token(TokenType.String);
             },
             ';' => {
@@ -150,7 +150,14 @@ pub const Lexer = struct {
                     try self.add_token(TokenType.Integer);
                 }
             },
-            else => unreachable,
+            else => {
+                std.debug.print("Unexpected character: '{c}' at line {d}, position {d}\n", .{
+                    self.current_char,
+                    self.line_number,
+                    self.position,
+                });
+                unreachable; // Handle unexpected characters
+            },
         }
     }
 

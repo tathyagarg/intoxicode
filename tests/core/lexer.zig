@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const lexer = @import("intoxicode").lexer;
+const loader = @import("intoxicode").loader;
 
 test "core.lexer.advance" {
     var input = std.ArrayList([]const u8).init(std.testing.allocator);
@@ -214,4 +215,50 @@ test "core.lexer.scan_tokens_integer" {
 
     try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.Integer);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "1000"));
+}
+
+test "core.lexer.scan_tokens_boolean" {
+    var input = std.ArrayList([]const u8).init(std.testing.allocator);
+    defer input.deinit();
+
+    try input.append("true false");
+
+    var lex = lexer.Lexer.init(input);
+    defer lex.deinit();
+
+    try lex.scan_tokens();
+
+    try std.testing.expect(lex.tokens.items.len == 3);
+
+    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.Boolean);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "true"));
+
+    try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.Boolean);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "false"));
+}
+
+test "core.lexer.scan_from_file" {
+    const allocator = std.testing.allocator;
+
+    const result = try loader.load_file(allocator, "examples/01_hello_world.??");
+    defer {
+        result.backing.deinit();
+        result.lines.deinit();
+    }
+
+    var lex = lexer.Lexer.init(result.lines);
+    defer lex.deinit();
+
+    try lex.scan_tokens();
+
+    try std.testing.expect(lex.tokens.items.len == 4);
+
+    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.Identifier);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "scream"));
+
+    try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.String);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "\"Hello world!\""));
+
+    try std.testing.expect(lex.tokens.items[2].token_type == lexer.tokens.TokenType.Period);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[2].value, "."));
 }
