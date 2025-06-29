@@ -38,7 +38,6 @@ pub const TokenType = enum {
 
     Fun,
     Throwaway, // return
-    Call,
 
     Try,
     Gotcha,
@@ -49,7 +48,6 @@ pub const TokenType = enum {
     Or,
     Not,
 
-    Semicolon,
     EOF,
 };
 

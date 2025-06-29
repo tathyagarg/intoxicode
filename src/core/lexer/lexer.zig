@@ -16,7 +16,6 @@ pub const Keywords = [_]Pair{
     .{ .key = "maybe", .value = TokenType.Maybe },
     .{ .key = "fun", .value = TokenType.Fun },
     .{ .key = "throwaway", .value = TokenType.Throwaway },
-    .{ .key = "call", .value = TokenType.Call },
     .{ .key = "try", .value = TokenType.Try },
     .{ .key = "gotcha", .value = TokenType.Gotcha },
     .{ .key = "and", .value = TokenType.And },
@@ -128,10 +127,6 @@ pub const Lexer = struct {
                 }
 
                 try self.add_token(TokenType.String);
-            },
-            ';' => {
-                try self.add_token(TokenType.Semicolon);
-                self.advance();
             },
             ' ' => {},
             '0'...'9' => {

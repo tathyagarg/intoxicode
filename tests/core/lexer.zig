@@ -137,21 +137,21 @@ test "core.lexer.all_kws" {
     var input = std.ArrayList([]const u8).init(std.testing.allocator);
     defer input.deinit();
 
-    try input.append("if else loop maybe fun throwaway call try gotcha and or not");
+    try input.append("if else loop maybe fun throwaway try gotcha and or not");
 
     var lex = lexer.Lexer.init(input);
     defer lex.deinit();
 
     try lex.scan_tokens();
 
-    try std.testing.expect(lex.tokens.items.len == 13);
+    try std.testing.expect(lex.tokens.items.len == 12);
 
-    const expected_keywords: [12][]const u8 = [_][]const u8{
-        "if", "else", "loop", "maybe", "fun", "throwaway", "call", "try", "gotcha", "and", "or", "not",
+    const expected_keywords: [11][]const u8 = [_][]const u8{
+        "if", "else", "loop", "maybe", "fun", "throwaway", "try", "gotcha", "and", "or", "not",
     };
 
-    const token_types: [12]lexer.tokens.TokenType = [_]lexer.tokens.TokenType{
-        .If, .Else, .Loop, .Maybe, .Fun, .Throwaway, .Call, .Try, .Gotcha, .And, .Or, .Not,
+    const token_types: [11]lexer.tokens.TokenType = [_]lexer.tokens.TokenType{
+        .If, .Else, .Loop, .Maybe, .Fun, .Throwaway, .Try, .Gotcha, .And, .Or, .Not,
     };
 
     for (expected_keywords, 0..) |keyword, i| {

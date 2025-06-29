@@ -1,7 +1,7 @@
 const std = @import("std");
 
-const Parser = @import("intoxicode").parser.Parser;
-const Argument = @import("intoxicode").argument.Argument;
+const Parser = @import("intoxicode").cli.Parser;
+const Argument = @import("intoxicode").cli.Argument;
 const CliError = @import("intoxicode").errors.CliError;
 
 test "cli.parser.help" {
