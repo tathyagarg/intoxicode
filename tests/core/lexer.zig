@@ -70,7 +70,7 @@ test "core.lexer.scan_tokens_basic" {
         .Modulo,
         .LessThan,
         .GreaterThan,
-        .Equal,
+        .Assignment,
         .LeftParen,
         .RightParen,
         .LeftBrace,

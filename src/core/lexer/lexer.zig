@@ -96,9 +96,22 @@ pub const Lexer = struct {
             '%' => try self.add_token(TokenType.Modulo),
             '<' => try self.add_token(TokenType.LessThan),
             '>' => try self.add_token(TokenType.GreaterThan),
-            '=' => try self.add_token(TokenType.Equal),
             '.' => try self.add_token(TokenType.Period),
             '?' => try self.add_token(TokenType.QuestionMark),
+            '=' => {
+                if (self.peek() == '=') {
+                    self.advance(); // Consume the '='
+                    try self.add_token(TokenType.Equal);
+                } else {
+                    try self.add_token(TokenType.Assignment);
+                }
+            },
+            '!' => {
+                if (self.peek() == '=') {
+                    self.advance(); // Consume the '='
+                    try self.add_token(TokenType.NotEqual);
+                }
+            },
             'a'...'z', 'A'...'Z', '_' => {
                 while (!self.at_end() and (self.current_char >= 'a' and self.current_char <= 'z' or
                     self.current_char >= 'A' and self.current_char <= 'Z' or

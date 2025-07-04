@@ -1,77 +1,207 @@
 const std = @import("std");
-const _tokens = @import("../lexer/tokens.zig");
+pub const expressions = @import("expressions.zig");
 
+const Expression = expressions.Expression;
+
+const _tokens = @import("../lexer/tokens.zig");
 const Token = _tokens.Token;
 const TokenType = _tokens.TokenType;
 
-pub const node = @import("node.zig");
-
-fn get_respective_node_type(token_type: TokenType) node.NodeType {
-    return switch (token_type) {
-        .Identifier => .Identifier,
-        .Integer, .Float, .String => .Literal,
-        .Plus, .Minus, .Multiply, .Divide, .Equal, .NotEqual, .LessThan, .GreaterThan => node.NodeType.Operator,
-        else => .Keyword,
-    };
-}
-
 pub const Parser = struct {
     tokens: std.ArrayList(Token),
-    program: node.Program,
+    current: usize = 0,
 
     allocator: std.mem.Allocator,
 
     pub fn init(tokens: std.ArrayList(Token), allocator: std.mem.Allocator) Parser {
         return Parser{
             .tokens = tokens,
-            .program = node.Program.init(allocator),
+            .current = 0,
             .allocator = allocator,
         };
     }
 
-    pub fn deinit(self: *Parser) void {
-        self.program.deinit();
+    fn consume(self: *Parser, token_type: TokenType, message: []const u8) !Token {
+        if (self.check(token_type)) {
+            return self.advance();
+        }
+
+        std.debug.panic("Expected token type: {}, but found: {}. {s}", .{
+            token_type,
+            self.peek().token_type,
+            message,
+        });
     }
 
-    pub fn parse(self: *Parser) !void {
-        while (self.tokens.items.len > 0) {
-            const token = self.tokens.items[0];
+    fn peek(self: *Parser) Token {
+        return self.tokens.items[self.current];
+    }
 
-            if (self.program.statements.items.len == 0) {
-                const new_statement = try self.allocator.create(node.Statement);
-                new_statement.* = node.Statement.init(self.allocator);
+    fn previous(self: *Parser) Token {
+        return self.tokens.items[self.current - 1];
+    }
 
-                try self.program.statements.append(new_statement);
+    fn is_at_end(self: *Parser) bool {
+        return self.peek().token_type == .EOF;
+    }
+
+    fn advance(self: *Parser) Token {
+        if (!self.is_at_end()) self.current += 1;
+        return self.previous();
+    }
+
+    fn check(self: *Parser, token_type: TokenType) bool {
+        if (self.is_at_end()) return false;
+        return self.peek().token_type == token_type;
+    }
+
+    fn match(self: *Parser, token_types: []const TokenType) bool {
+        for (token_types) |token_type| {
+            if (self.check(token_type)) {
+                _ = self.advance();
+                return true;
             }
-            var curr_statement = self.program.statements.items[self.program.statements.items.len - 1];
-
-            switch (token.token_type) {
-                .Period => |_| {
-                    curr_statement.certainty = 1.0;
-
-                    const new_statement = try self.allocator.create(node.Statement);
-                    new_statement.* = node.Statement.init(self.allocator);
-
-                    try self.program.statements.append(new_statement);
-                },
-                .EOF => |_| {
-                    curr_statement.certainty = 0.0;
-
-                    const new_node = try self.allocator.create(node.Node);
-                    new_node.* = node.Node.init(self.allocator, node.NodeType.EOF, null);
-
-                    try curr_statement.add_child(new_node);
-                },
-                else => {
-                    const node_type = get_respective_node_type(token.token_type);
-
-                    const new_node = try self.allocator.create(node.Node);
-                    new_node.* = node.Node.init(self.allocator, node_type, token.value);
-
-                    try curr_statement.add_child(new_node);
-                },
-            }
-            _ = self.tokens.orderedRemove(0);
         }
+        return false;
+    }
+
+    pub fn parse(self: *Parser) !Expression {
+        return try self.expression();
+    }
+
+    fn expression(self: *Parser) error{ OutOfMemory, InvalidCharacter }!Expression {
+        return try self.equality();
+    }
+
+    fn equality(self: *Parser) !Expression {
+        var expr = try self.comparison();
+
+        while (self.match((&[_]TokenType{ .Equal, .NotEqual })[0..])) {
+            const operator = self.previous();
+
+            const right = try self.allocator.create(Expression);
+            right.* = try self.comparison();
+
+            const left = try self.allocator.create(Expression);
+            left.* = expr;
+
+            expr = Expression{
+                .binary = expressions.Binary{
+                    .left = left,
+                    .operator = operator,
+                    .right = right,
+                },
+            };
+        }
+
+        return expr;
+    }
+
+    fn comparison(self: *Parser) !Expression {
+        var expr = try self.term();
+
+        while (self.match((&[_]TokenType{ .GreaterThan, .LessThan })[0..])) {
+            const operator = self.previous();
+
+            const right = try self.allocator.create(Expression);
+            right.* = try self.term();
+
+            const left = try self.allocator.create(Expression);
+            left.* = expr;
+
+            expr = Expression{
+                .binary = expressions.Binary{
+                    .left = left,
+                    .operator = operator,
+                    .right = right,
+                },
+            };
+        }
+
+        return expr;
+    }
+
+    fn term(self: *Parser) !Expression {
+        var expr = try self.factor();
+
+        while (self.match(&[_]TokenType{ .Plus, .Minus })) {
+            const operator = self.previous();
+
+            const right = try self.allocator.create(Expression);
+            right.* = try self.factor();
+
+            const left = try self.allocator.create(Expression);
+            left.* = expr;
+
+            expr = Expression{
+                .binary = expressions.Binary{
+                    .left = left,
+                    .operator = operator,
+                    .right = right,
+                },
+            };
+        }
+
+        return expr;
+    }
+
+    fn factor(self: *Parser) !Expression {
+        var expr = try self.primary();
+
+        while (self.match(&[_]TokenType{ .Multiply, .Divide })) {
+            const operator = self.previous();
+
+            const right = try self.allocator.create(Expression);
+            right.* = try self.primary();
+
+            const left = try self.allocator.create(Expression);
+            left.* = expr;
+
+            expr = Expression{
+                .binary = expressions.Binary{
+                    .left = left,
+                    .operator = operator,
+                    .right = right,
+                },
+            };
+        }
+
+        return expr;
+    }
+
+    fn primary(self: *Parser) !Expression {
+        if (self.match(&[_]TokenType{ .Integer, .Float, .String, .Identifier })) {
+            const token = self.previous();
+
+            return switch (token.token_type) {
+                .Identifier => Expression{
+                    .identifier = expressions.Identifier{
+                        .name = token.value,
+                    },
+                },
+                .Integer, .Float => Expression{ .literal = try expressions.Literal.number_from_string(token.value) },
+                .String => Expression{
+                    .literal = expressions.Literal{
+                        .string = token.value,
+                    },
+                },
+                else => unreachable,
+            };
+        }
+
+        if (self.match(&[_]TokenType{.LeftParen})) {
+            const expr = try self.allocator.create(Expression);
+            expr.* = try self.expression();
+
+            _ = try self.consume(.RightParen, "Expected ')' after expression.");
+
+            return Expression{
+                .grouping = expressions.Grouping{
+                    .expression = expr,
+                },
+            };
+        }
+
+        std.debug.panic("Unexpected token: {s}", .{self.peek().value});
     }
 };

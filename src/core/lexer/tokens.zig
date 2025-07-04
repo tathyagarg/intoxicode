@@ -1,3 +1,5 @@
+const std = @import("std");
+
 pub const TokenType = enum {
     LeftParen,
     RightParen,
@@ -55,7 +57,7 @@ pub const Token = struct {
     token_type: TokenType,
     value: []const u8,
 
-    line: usize,
+    line: usize = 0,
 
     pub fn init(token_type: TokenType, value: []const u8, line: usize) Token {
         return Token{
@@ -67,5 +69,9 @@ pub const Token = struct {
 
     pub fn is_eof(self: Token) bool {
         return self.token_type == TokenType.EOF;
+    }
+
+    pub fn equals(self: Token, other: Token) bool {
+        return self.token_type == other.token_type and std.mem.eql(u8, self.value, other.value);
     }
 };
