@@ -27,11 +27,11 @@ test "core.parser.parser.basic" {
     try tokens.append(Token{ .token_type = .EOF, .value = "" });
 
     var p = Parser.init(tokens, allocator);
-    const expression = try p.parse();
-    defer expression.deinit();
+    const statements = try p.parse();
+    defer statements.deinit();
 
     try std.testing.expect(
-        expression.equals(
+        statements.items[0].expression.equals(
             Expression{
                 .binary = expressions.Binary{
                     .left = &Expression{ .literal = expressions.Literal{ .number = 42.1 } },
@@ -45,6 +45,36 @@ test "core.parser.parser.basic" {
                     } },
                 },
             },
+        ),
+    );
+}
+
+test "core.parser.parser.assign" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const allocator = arena.allocator();
+
+    var tokens = std.ArrayList(Token).init(std.testing.allocator);
+    defer tokens.deinit();
+
+    try tokens.append(Token{ .token_type = .Identifier, .value = "x" });
+    try tokens.append(Token{ .token_type = .Assignment, .value = "=" });
+    try tokens.append(Token{ .token_type = .Float, .value = "42.1" });
+    try tokens.append(Token{ .token_type = .EOF, .value = "" });
+
+    var p = Parser.init(tokens, allocator);
+    const statements = try p.parse();
+    defer statements.deinit();
+
+    try std.testing.expectEqualStrings(
+        "x",
+        statements.items[0].assignment.identifier,
+    );
+
+    try std.testing.expect(
+        statements.items[0].assignment.expression.equals(
+            Expression{ .literal = expressions.Literal{ .number = 42.1 } },
         ),
     );
 }

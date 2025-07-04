@@ -18,6 +18,7 @@ pub const TokenType = enum {
     Equal,
     NotEqual,
 
+    Comma,
     Period,
     QuestionMark,
 

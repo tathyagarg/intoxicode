@@ -1,7 +1,10 @@
 const std = @import("std");
+
 pub const expressions = @import("expressions.zig");
+pub const statements = @import("statement.zig");
 
 const Expression = expressions.Expression;
+const Statement = statements.Statement;
 
 const _tokens = @import("../lexer/tokens.zig");
 const Token = _tokens.Token;
@@ -65,8 +68,169 @@ pub const Parser = struct {
         return false;
     }
 
-    pub fn parse(self: *Parser) !Expression {
-        return try self.expression();
+    pub fn parse(self: *Parser) error{ OutOfMemory, InvalidCharacter }!std.ArrayList(Statement) {
+        var stmts = std.ArrayList(Statement).init(self.allocator);
+
+        while (!self.is_at_end()) {
+            const statement_obj = try self.statement();
+            try stmts.append(statement_obj);
+        }
+
+        return stmts;
+    }
+
+    fn statement(self: *Parser) error{ OutOfMemory, InvalidCharacter }!Statement {
+        if (self.match(&[_]TokenType{.If})) {
+            return try self.if_statement();
+        } else if (self.match(&[_]TokenType{.Loop})) {
+            return try self.loop_statement();
+        } else if (self.match(&[_]TokenType{.Fun})) {
+            return try self.function_declaration();
+        } else if (self.match(&[_]TokenType{.Try})) {
+            return try self.try_statement();
+        } else if (self.match(&[_]TokenType{.Throwaway})) {
+            return try self.throwaway_statement();
+        } else if (self.match(&[_]TokenType{.Identifier})) {
+            return try self.assignment_or_expression();
+        }
+
+        return try self.expression_statement();
+    }
+
+    fn expression_statement(self: *Parser) !Statement {
+        const expr = try self.expression();
+        return Statement{ .expression = expr };
+    }
+
+    fn assignment_or_expression(self: *Parser) !Statement {
+        const identifier = self.previous().value;
+
+        if (self.match(&[_]TokenType{.Assignment})) {
+            const expr = try self.expression();
+            return Statement{
+                .assignment = statements.Assignment{
+                    .identifier = identifier,
+                    .expression = expr,
+                },
+            };
+        }
+
+        const expr = try self.expression();
+        return Statement{ .expression = expr };
+    }
+
+    fn if_statement(self: *Parser) !Statement {
+        const condition = try self.expression();
+        _ = try self.consume(.LeftParen, "Expected '(' after 'if'.");
+
+        var then_branch = std.ArrayList(Statement).init(self.allocator);
+        defer then_branch.deinit();
+
+        while (!self.is_at_end() and !self.check(.Else)) {
+            const stmt = try self.statement();
+            try then_branch.append(stmt);
+        }
+
+        var else_branch: ?std.ArrayList(Statement) = null;
+        if (self.match(&[_]TokenType{.Else})) {
+            else_branch = std.ArrayList(Statement).init(self.allocator);
+            defer else_branch.?.deinit();
+
+            while (!self.is_at_end()) {
+                const stmt = try self.statement();
+                try else_branch.?.append(stmt);
+            }
+        }
+
+        return Statement{
+            .if_statement = statements.IfStatement{
+                .condition = condition,
+                .then_branch = then_branch,
+                .else_branch = else_branch,
+            },
+        };
+    }
+
+    fn loop_statement(self: *Parser) !Statement {
+        const condition = try self.expression();
+        _ = try self.consume(.LeftParen, "Expected '(' after 'loop'.");
+
+        var body = std.ArrayList(Statement).init(self.allocator);
+        defer body.deinit();
+
+        while (!self.is_at_end()) {
+            const stmt = try self.statement();
+            try body.append(stmt);
+        }
+
+        return Statement{
+            .loop_statement = statements.LoopStatement{
+                .condition = condition,
+                .body = body,
+            },
+        };
+    }
+
+    fn function_declaration(self: *Parser) !Statement {
+        const name = self.previous().value;
+        _ = try self.consume(.LeftParen, "Expected '(' after function name.");
+
+        var params = std.ArrayList([]const u8).init(self.allocator);
+        defer params.deinit();
+
+        while (!self.is_at_end() and !self.check(.RightParen)) {
+            if (self.match(&[_]TokenType{.Identifier})) {
+                try params.append(self.previous().value);
+            } else {
+                std.debug.panic("Expected identifier for function parameter.", .{});
+            }
+
+            if (!self.match(&[_]TokenType{.Comma})) break;
+        }
+
+        _ = try self.consume(.RightParen, "Expected ')' after function parameters.");
+
+        _ = try self.consume(.LeftBrace, "Expected '{' to start function body.");
+
+        var body = std.ArrayList(Statement).init(self.allocator);
+
+        while (!self.is_at_end() and !self.check(.RightBrace)) {
+            const stmt = try self.statement();
+            try body.append(stmt);
+        }
+
+        _ = try self.consume(.RightBrace, "Expected '}' to end function body.");
+
+        return Statement{
+            .function_declaration = statements.FunctionDeclaration{
+                .name = name,
+                .parameters = params,
+                .body = body,
+            },
+        };
+    }
+
+    fn try_statement(self: *Parser) !Statement {
+        const expr = try self.expression();
+        _ = try self.consume(.LeftParen, "Expected '(' after 'try'.");
+
+        return Statement{
+            .try_statement = statements.TryStatement{
+                .expression = expr,
+                .catch_block = null,
+            },
+        };
+    }
+
+    fn throwaway_statement(self: *Parser) !Statement {
+        const expr = try self.expression();
+        _ = try self.consume(.LeftParen, "Expected '(' after 'throwaway'.");
+
+        return Statement{
+            .throwaway_statement = statements.ThrowawayStatement{
+                .expression = expr,
+            },
+        };
     }
 
     fn expression(self: *Parser) error{ OutOfMemory, InvalidCharacter }!Expression {
