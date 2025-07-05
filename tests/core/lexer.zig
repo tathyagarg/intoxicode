@@ -97,10 +97,10 @@ test "core.lexer.scan_tokens_identifier" {
 
     try std.testing.expect(lex.tokens.items.len == 3);
 
-    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.Identifier);
+    try std.testing.expect(lex.tokens.items[0].token_type == .Identifier);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "identifier123"));
 
-    try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.Identifier);
+    try std.testing.expect(lex.tokens.items[1].token_type == .Identifier);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "another__ThingY"));
 }
 
@@ -173,7 +173,7 @@ test "core.lexer.scan_tokens_string" {
 
     try std.testing.expect(lex.tokens.items.len == 2);
 
-    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.String);
+    try std.testing.expect(lex.tokens.items[0].token_type == .String);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "\"Hello, world!\""));
 }
 
@@ -190,10 +190,10 @@ test "core.lexer.scan_tokens_float" {
 
     try std.testing.expect(lex.tokens.items.len == 3);
 
-    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.Float);
+    try std.testing.expect(lex.tokens.items[0].token_type == .Float);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "3.14"));
 
-    try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.Float);
+    try std.testing.expect(lex.tokens.items[1].token_type == .Float);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "2.718"));
 }
 
@@ -210,10 +210,10 @@ test "core.lexer.scan_tokens_integer" {
 
     try std.testing.expect(lex.tokens.items.len == 3);
 
-    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.Integer);
+    try std.testing.expect(lex.tokens.items[0].token_type == .Integer);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "42"));
 
-    try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.Integer);
+    try std.testing.expect(lex.tokens.items[1].token_type == .Integer);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "1000"));
 }
 
@@ -230,10 +230,10 @@ test "core.lexer.scan_tokens_boolean" {
 
     try std.testing.expect(lex.tokens.items.len == 3);
 
-    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.Boolean);
+    try std.testing.expect(lex.tokens.items[0].token_type == .Boolean);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "true"));
 
-    try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.Boolean);
+    try std.testing.expect(lex.tokens.items[1].token_type == .Boolean);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "false"));
 }
 
@@ -251,14 +251,17 @@ test "core.lexer.scan_from_file" {
 
     try lex.scan_tokens();
 
-    try std.testing.expect(lex.tokens.items.len == 4);
+    try std.testing.expect(lex.tokens.items.len == 6);
 
-    try std.testing.expect(lex.tokens.items[0].token_type == lexer.tokens.TokenType.Identifier);
+    try std.testing.expect(lex.tokens.items[0].token_type == .Identifier);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "scream"));
 
-    try std.testing.expect(lex.tokens.items[1].token_type == lexer.tokens.TokenType.String);
-    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[1].value, "\"Hello world!\""));
+    try std.testing.expect(lex.tokens.items[1].token_type == .LeftParen);
 
-    try std.testing.expect(lex.tokens.items[2].token_type == lexer.tokens.TokenType.Period);
-    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[2].value, "."));
+    try std.testing.expect(lex.tokens.items[2].token_type == .String);
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[2].value, "\"Hello world!\""));
+
+    try std.testing.expect(lex.tokens.items[3].token_type == .RightParen);
+
+    try std.testing.expect(lex.tokens.items[4].token_type == .Period);
 }

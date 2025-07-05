@@ -113,12 +113,14 @@ pub const Lexer = struct {
                 }
             },
             'a'...'z', 'A'...'Z', '_' => {
-                while (!self.at_end() and (self.current_char >= 'a' and self.current_char <= 'z' or
-                    self.current_char >= 'A' and self.current_char <= 'Z' or
-                    self.current_char >= '0' and self.current_char <= '9' or
-                    self.current_char == '_') and self.peek() != ';' and self.peek() != ' ')
+                var next = self.peek();
+                while (!self.at_end() and (next >= 'a' and next <= 'z' or
+                    next >= 'A' and next <= 'Z' or
+                    next >= '0' and next <= '9' or
+                    next == '_'))
                 {
                     self.advance();
+                    next = self.peek();
                 }
 
                 var token_type = TokenType.Identifier;
