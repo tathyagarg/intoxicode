@@ -6,6 +6,7 @@ pub const Expression = union(enum) {
     grouping: Grouping,
     literal: Literal,
     identifier: Identifier,
+    call: Call,
 
     pub fn equals(self: Expression, other: Expression) bool {
         return switch (other) {
@@ -34,6 +35,18 @@ pub const Expression = union(enum) {
             },
             .identifier => |id| switch (self) {
                 .identifier => |self_id| std.mem.eql(u8, id.name, self_id.name),
+                else => false,
+            },
+            .call => |c| switch (self) {
+                .call => |self_c| {
+                    if (!self_c.callee.equals(c.callee.*)) return false;
+                    if (self_c.arguments.?.items.len != c.arguments.?.items.len) return false;
+
+                    for (self_c.arguments.?.items, c.arguments.?.items) |arg, other_arg| {
+                        if (!arg.equals(other_arg)) return false;
+                    }
+                    return true;
+                },
                 else => false,
             },
         };
@@ -70,6 +83,24 @@ pub const Expression = union(enum) {
                 .boolean => if (self.literal.boolean) "true" else "false",
             },
             .identifier => self.identifier.pretty_print(allocator),
+            .call => |c| {
+                const callee = try c.callee.pretty_print(allocator);
+                defer allocator.free(callee);
+
+                var args = std.ArrayList([]const u8).init(allocator);
+                defer args.deinit();
+
+                for (c.arguments.?.items) |arg| {
+                    const arg_str = try arg.pretty_print(allocator);
+                    try args.append(arg_str);
+                }
+
+                return try std.fmt.allocPrint(
+                    allocator,
+                    "Call({s} ({d} args))",
+                    .{ callee, args.items.len },
+                );
+            },
         };
     }
 
@@ -112,8 +143,17 @@ pub const Identifier = struct {
 
     pub fn pretty_print(self: Identifier, allocator: std.mem.Allocator) ![]const u8 {
         const message = try std.fmt.allocPrint(allocator, "{s}", .{self.name});
-        defer allocator.free(message);
 
         return message;
+    }
+};
+
+pub const Call = struct {
+    callee: *const Expression,
+    arguments: ?std.ArrayList(Expression),
+
+    pub fn deinit(self: Call) void {
+        for (self.arguments.items) |arg| arg.deinit();
+        self.arguments.deinit();
     }
 };

@@ -68,8 +68,8 @@ pub const Parser = struct {
         return false;
     }
 
-    pub fn parse(self: *Parser) error{ OutOfMemory, InvalidCharacter }!std.ArrayList(Statement) {
-        var stmts = std.ArrayList(Statement).init(self.allocator);
+    pub fn parse(self: *Parser) error{ OutOfMemory, InvalidCharacter }!std.ArrayList(*Statement) {
+        var stmts = std.ArrayList(*Statement).init(self.allocator);
 
         while (!self.is_at_end()) {
             const statement_obj = try self.statement();
@@ -79,51 +79,105 @@ pub const Parser = struct {
         return stmts;
     }
 
-    fn statement(self: *Parser) error{ OutOfMemory, InvalidCharacter }!Statement {
-        if (self.match(&[_]TokenType{.If})) {
-            return try self.if_statement();
-        } else if (self.match(&[_]TokenType{.Loop})) {
-            return try self.loop_statement();
-        } else if (self.match(&[_]TokenType{.Fun})) {
-            return try self.function_declaration();
-        } else if (self.match(&[_]TokenType{.Try})) {
-            return try self.try_statement();
-        } else if (self.match(&[_]TokenType{.Throwaway})) {
-            return try self.throwaway_statement();
-        } else if (self.match(&[_]TokenType{.Identifier})) {
-            return try self.assignment_or_expression();
+    fn statement(self: *Parser) error{ OutOfMemory, InvalidCharacter }!*Statement {
+        const found_stmt = if (self.match(&[_]TokenType{.If}))
+            try self.if_statement()
+        else if (self.match(&[_]TokenType{.Loop}))
+            try self.loop_statement()
+        else if (self.match(&[_]TokenType{.Fun}))
+            try self.function_declaration()
+        else if (self.match(&[_]TokenType{.Try}))
+            try self.try_statement()
+        else if (self.match(&[_]TokenType{.Throwaway}))
+            try self.throwaway_statement()
+        else if (self.match(&[_]TokenType{.Identifier}))
+            try self.assignment_or_expression()
+        else
+            try self.expression_statement();
+
+        const next = self.advance();
+        const certainty: f32 = switch (next.token_type) {
+            .Period => 1.0,
+            .QuestionMark => 0.75,
+            else => unreachable,
+        };
+
+        switch (found_stmt.*) {
+            .expression => {},
+            else => |*v| try v.set_certainty(certainty),
         }
-
-        return try self.expression_statement();
+        return found_stmt;
     }
 
-    fn expression_statement(self: *Parser) !Statement {
+    fn expression_statement(self: *Parser) !*Statement {
         const expr = try self.expression();
-        return Statement{ .expression = expr };
+
+        const stmt = try self.allocator.create(Statement);
+        stmt.* = Statement{
+            .expression = expr,
+        };
+
+        return stmt;
     }
 
-    fn assignment_or_expression(self: *Parser) !Statement {
+    fn assignment_or_expression(self: *Parser) !*Statement {
+        //const previous_token = self.previous();
         const identifier = self.previous().value;
 
         if (self.match(&[_]TokenType{.Assignment})) {
             const expr = try self.expression();
-            return Statement{
+
+            const stmt = try self.allocator.create(Statement);
+            stmt.* = Statement{
                 .assignment = statements.Assignment{
                     .identifier = identifier,
                     .expression = expr,
                 },
             };
+
+            return stmt;
         }
 
-        const expr = try self.expression();
-        return Statement{ .expression = expr };
+        if (self.match(&[_]TokenType{.LeftParen})) {
+            const args = try self.allocator.create(std.ArrayList(Expression));
+            args.* = std.ArrayList(Expression).init(self.allocator);
+
+            while (!self.is_at_end() and !self.check(.RightParen)) {
+                const arg = try self.expression();
+                try args.append(arg);
+
+                if (!self.match(&[_]TokenType{.Comma})) break;
+            }
+
+            _ = try self.consume(.RightParen, "Expected ')' after function arguments.");
+
+            const identifier_expr = try self.allocator.create(Expression);
+            identifier_expr.* = Expression{
+                .identifier = expressions.Identifier{
+                    .name = identifier,
+                },
+            };
+
+            const stmt = try self.allocator.create(Statement);
+            stmt.* = Statement{
+                .expression = Expression{
+                    .call = expressions.Call{
+                        .callee = identifier_expr,
+                        .arguments = args.*,
+                    },
+                },
+            };
+
+            return stmt;
+        }
+
+        return self.expression_statement();
     }
 
-    fn if_statement(self: *Parser) !Statement {
+    fn if_statement(self: *Parser) !*Statement {
         const condition = try self.expression();
-        _ = try self.consume(.LeftParen, "Expected '(' after 'if'.");
 
-        var then_branch = std.ArrayList(Statement).init(self.allocator);
+        var then_branch = std.ArrayList(*Statement).init(self.allocator);
         defer then_branch.deinit();
 
         while (!self.is_at_end() and !self.check(.Else)) {
@@ -131,9 +185,9 @@ pub const Parser = struct {
             try then_branch.append(stmt);
         }
 
-        var else_branch: ?std.ArrayList(Statement) = null;
+        var else_branch: ?std.ArrayList(*Statement) = null;
         if (self.match(&[_]TokenType{.Else})) {
-            else_branch = std.ArrayList(Statement).init(self.allocator);
+            else_branch = std.ArrayList(*Statement).init(self.allocator);
             defer else_branch.?.deinit();
 
             while (!self.is_at_end()) {
@@ -142,20 +196,23 @@ pub const Parser = struct {
             }
         }
 
-        return Statement{
+        const stmt = try self.allocator.create(Statement);
+        stmt.* = Statement{
             .if_statement = statements.IfStatement{
                 .condition = condition,
                 .then_branch = then_branch,
                 .else_branch = else_branch,
             },
         };
+
+        return stmt;
     }
 
-    fn loop_statement(self: *Parser) !Statement {
+    fn loop_statement(self: *Parser) !*Statement {
         const condition = try self.expression();
         _ = try self.consume(.LeftParen, "Expected '(' after 'loop'.");
 
-        var body = std.ArrayList(Statement).init(self.allocator);
+        var body = std.ArrayList(*Statement).init(self.allocator);
         defer body.deinit();
 
         while (!self.is_at_end()) {
@@ -163,15 +220,18 @@ pub const Parser = struct {
             try body.append(stmt);
         }
 
-        return Statement{
+        const stmt = try self.allocator.create(Statement);
+        stmt.* = Statement{
             .loop_statement = statements.LoopStatement{
                 .condition = condition,
                 .body = body,
             },
         };
+
+        return stmt;
     }
 
-    fn function_declaration(self: *Parser) !Statement {
+    fn function_declaration(self: *Parser) !*Statement {
         const name = self.previous().value;
         _ = try self.consume(.LeftParen, "Expected '(' after function name.");
 
@@ -192,7 +252,7 @@ pub const Parser = struct {
 
         _ = try self.consume(.LeftBrace, "Expected '{' to start function body.");
 
-        var body = std.ArrayList(Statement).init(self.allocator);
+        var body = std.ArrayList(*Statement).init(self.allocator);
 
         while (!self.is_at_end() and !self.check(.RightBrace)) {
             const stmt = try self.statement();
@@ -201,36 +261,45 @@ pub const Parser = struct {
 
         _ = try self.consume(.RightBrace, "Expected '}' to end function body.");
 
-        return Statement{
+        const stmt = try self.allocator.create(Statement);
+        stmt.* = Statement{
             .function_declaration = statements.FunctionDeclaration{
                 .name = name,
                 .parameters = params,
                 .body = body,
             },
         };
+
+        return stmt;
     }
 
-    fn try_statement(self: *Parser) !Statement {
+    fn try_statement(self: *Parser) !*Statement {
         const expr = try self.expression();
         _ = try self.consume(.LeftParen, "Expected '(' after 'try'.");
 
-        return Statement{
+        const stmt = try self.allocator.create(Statement);
+        stmt.* = Statement{
             .try_statement = statements.TryStatement{
                 .expression = expr,
                 .catch_block = null,
             },
         };
+
+        return stmt;
     }
 
-    fn throwaway_statement(self: *Parser) !Statement {
+    fn throwaway_statement(self: *Parser) !*Statement {
         const expr = try self.expression();
         _ = try self.consume(.LeftParen, "Expected '(' after 'throwaway'.");
 
-        return Statement{
+        const stmt = try self.allocator.create(Statement);
+        stmt.* = Statement{
             .throwaway_statement = statements.ThrowawayStatement{
                 .expression = expr,
             },
         };
+
+        return stmt;
     }
 
     fn expression(self: *Parser) error{ OutOfMemory, InvalidCharacter }!Expression {
@@ -310,13 +379,13 @@ pub const Parser = struct {
     }
 
     fn factor(self: *Parser) !Expression {
-        var expr = try self.primary();
+        var expr = try self.call();
 
         while (self.match(&[_]TokenType{ .Multiply, .Divide })) {
             const operator = self.previous();
 
             const right = try self.allocator.create(Expression);
-            right.* = try self.primary();
+            right.* = try self.call();
 
             const left = try self.allocator.create(Expression);
             left.* = expr;
@@ -326,6 +395,36 @@ pub const Parser = struct {
                     .left = left,
                     .operator = operator,
                     .right = right,
+                },
+            };
+        }
+
+        return expr;
+    }
+
+    fn call(self: *Parser) !Expression {
+        var expr = try self.primary();
+
+        while (self.match(&[_]TokenType{.LeftParen})) {
+            const args = try self.allocator.create(std.ArrayList(Expression));
+            args.* = std.ArrayList(Expression).init(self.allocator);
+
+            while (!self.is_at_end() and !self.check(.RightParen)) {
+                const arg = try self.expression();
+                try args.append(arg);
+
+                if (!self.match(&[_]TokenType{.Comma})) break;
+            }
+
+            _ = try self.consume(.RightParen, "Expected ')' after arguments.");
+
+            const callee = try self.allocator.create(Expression);
+            callee.* = expr;
+
+            expr = Expression{
+                .call = expressions.Call{
+                    .callee = callee,
+                    .arguments = args.*,
                 },
             };
         }

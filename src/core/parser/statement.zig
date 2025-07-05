@@ -23,11 +23,37 @@ pub const Statement = union(enum) {
             .throwaway_statement => |t| t.deinit(),
         }
     }
+
+    pub fn get_certainty(self: Statement) !f32 {
+        return switch (self) {
+            .expression => std.debug.panic("Cannot get certainty of an expression statement", .{}),
+            .assignment => self.assignment.certainty,
+            .if_statement => self.if_statement.certainty,
+            .loop_statement => self.loop_statement.certainty,
+            .function_declaration => self.function_declaration.certainty,
+            .try_statement => self.try_statement.certainty,
+            .throwaway_statement => self.throwaway_statement.certainty,
+        };
+    }
+
+    pub fn set_certainty(self: *Statement, certainty: f32) !void {
+        switch (self.*) {
+            .expression => std.debug.panic("Cannot set certainty of an expression statement", .{}),
+            .assignment => |*a| a.certainty = certainty,
+            .if_statement => |*i| i.certainty = certainty,
+            .loop_statement => |*l| l.certainty = certainty,
+            .function_declaration => |*f| f.certainty = certainty,
+            .try_statement => |*t| t.certainty = certainty,
+            .throwaway_statement => |*t| t.certainty = certainty,
+        }
+    }
 };
 
 pub const Assignment = struct {
     identifier: []const u8,
     expression: Expression,
+
+    certainty: f32 = 1.0,
 
     pub fn deinit(self: Assignment) void {
         self.expression.deinit();
@@ -36,8 +62,10 @@ pub const Assignment = struct {
 
 pub const IfStatement = struct {
     condition: Expression,
-    then_branch: std.ArrayList(Statement),
-    else_branch: ?std.ArrayList(Statement),
+    then_branch: std.ArrayList(*Statement),
+    else_branch: ?std.ArrayList(*Statement),
+
+    certainty: f32 = 1.0,
 
     pub fn deinit(self: IfStatement) void {
         self.condition.deinit();
@@ -52,7 +80,9 @@ pub const IfStatement = struct {
 
 pub const LoopStatement = struct {
     condition: Expression,
-    body: std.ArrayList(Statement),
+    body: std.ArrayList(*Statement),
+
+    certainty: f32 = 1.0,
 
     pub fn deinit(self: LoopStatement) void {
         self.condition.deinit();
@@ -64,7 +94,9 @@ pub const LoopStatement = struct {
 pub const FunctionDeclaration = struct {
     name: []const u8,
     parameters: std.ArrayList([]const u8),
-    body: std.ArrayList(Statement),
+    body: std.ArrayList(*Statement),
+
+    certainty: f32 = 1.0,
 
     pub fn deinit(self: FunctionDeclaration) void {
         for (self.parameters.items) |param| std.mem.free(param);
@@ -78,6 +110,8 @@ pub const TryStatement = struct {
     expression: Expression,
     catch_block: ?std.ArrayList(Statement),
 
+    certainty: f32 = 1.0,
+
     pub fn deinit(self: TryStatement) void {
         self.expression.deinit();
         for (self.catch_block.?.items) |s| s.deinit();
@@ -87,6 +121,8 @@ pub const TryStatement = struct {
 
 pub const ThrowawayStatement = struct {
     expression: Expression,
+
+    certainty: f32 = 1.0,
 
     pub fn deinit(self: ThrowawayStatement) void {
         self.expression.deinit();
