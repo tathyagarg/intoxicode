@@ -1,1 +1,2 @@
-scream("Hello world!").
+scream("Hello world!\n").
+scream("Bye world!\n").

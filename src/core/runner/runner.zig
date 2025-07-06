@@ -35,9 +35,9 @@ pub const Runner = struct {
         self.variables.deinit();
     }
 
-    pub fn run(self: Runner, statements: []Statement) !void {
+    pub fn run(self: Runner, statements: []*Statement) !void {
         for (statements) |statement| {
-            switch (statement) {
+            switch (statement.*) {
                 .assignment => |assignment| {
                     const key = assignment.identifier;
                     const value = try self.evaluate_expression(assignment.expression);
@@ -117,7 +117,6 @@ pub const Runner = struct {
                     .identifier => |id| {
                         if (std.mem.eql(u8, id.name, "scream")) {
                             var output = std.ArrayList(u8).init(self.allocator);
-                            defer output.deinit();
 
                             if (call.arguments != null) {
                                 for (call.arguments.?.items) |arg| {

@@ -1,9 +1,9 @@
 const std = @import("std");
 
 const Runner = @import("root.zig").runner.Runner;
-const Expression = @import("root.zig").parser.expressions.Expression;
-const Statement = @import("root.zig").parser.statements.Statement;
-const Identifier = @import("root.zig").parser.expressions.Identifier;
+const Parser = @import("root.zig").parser.Parser;
+const Lexer = @import("root.zig").lexer.Lexer;
+const loader = @import("root.zig").loader;
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -11,36 +11,18 @@ pub fn main() !void {
 
     const allocator = arena.allocator();
 
-    const runner = try Runner.init(allocator);
+    var stdout = std.io.getStdOut().writer();
+    var stderr = std.io.getStdErr().writer();
 
-    var statements = std.ArrayList(Statement).init(allocator);
+    const data = try loader.load_file(allocator, "examples/01_hello_world.??");
+    var lexer = Lexer.init(data, allocator);
 
-    var arguments = std.ArrayList(Expression).init(allocator);
+    try lexer.scan_tokens();
 
-    try arguments.append(Expression{
-        .literal = .{
-            .number = 42,
-        },
-    });
+    var parser = Parser.init(lexer.tokens, allocator);
+    const statements = try parser.parse();
 
-    try arguments.append(Expression{
-        .literal = .{
-            .string = "Hello, World!\n",
-        },
-    });
-
-    statements.append(Statement{
-        .expression = Expression{
-            .call = .{
-                .callee = &Expression{
-                    .identifier = Identifier{
-                        .name = "scream",
-                    },
-                },
-                .arguments = arguments,
-            },
-        },
-    }) catch unreachable;
+    const runner = try Runner.init(allocator, stdout.any(), stderr.any());
 
     try runner.run(
         statements.items,

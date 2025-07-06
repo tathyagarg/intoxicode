@@ -55,14 +55,14 @@ pub const Lexer = struct {
 
     tokens: std.ArrayList(Token),
 
-    pub fn init(input: std.ArrayList([]const u8)) Lexer {
+    pub fn init(input: std.ArrayList([]const u8), allocator: std.mem.Allocator) Lexer {
         const lexer = Lexer{
             .input = input,
             .line_number = 0,
             .start_position = 0,
             .position = 0,
             .current_char = 0,
-            .tokens = std.ArrayList(Token).init(std.testing.allocator),
+            .tokens = std.ArrayList(Token).init(allocator),
         };
 
         return lexer;
@@ -124,6 +124,7 @@ pub const Lexer = struct {
                 }
 
                 var token_type = TokenType.Identifier;
+
                 const value = self.get_value();
 
                 if (is_keyword(value)) {
@@ -161,11 +162,13 @@ pub const Lexer = struct {
                 }
             },
             else => {
-                std.debug.print("Unexpected character: '{c}' at line {d}, position {d}\n", .{
+                std.debug.print("Unexpected character: '{c}' ({d}) at line {d}, position {d}\n", .{
+                    self.current_char,
                     self.current_char,
                     self.line_number,
                     self.position,
                 });
+                std.debug.print("Input: {s}\n", .{self.input.items[self.line_number]});
                 unreachable; // Handle unexpected characters
             },
         }
@@ -186,6 +189,7 @@ pub const Lexer = struct {
         const line_number = self.get_actual_line();
 
         const end_index = if (self.start_position >= self.position) self.input.items[line_number].len else self.position;
+
         return self.input.items[line_number][self.start_position..end_index];
     }
 
@@ -229,6 +233,7 @@ pub const Lexer = struct {
 
         if (overflow) {
             self.line_number += 1;
+            self.start_position = 0;
             self.position = 0;
         }
 

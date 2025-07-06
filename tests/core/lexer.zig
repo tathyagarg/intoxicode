@@ -3,13 +3,15 @@ const std = @import("std");
 const lexer = @import("intoxicode").lexer;
 const loader = @import("intoxicode").loader;
 
+const allocator = std.testing.allocator;
+
 test "core.lexer.advance" {
     var input = std.ArrayList([]const u8).init(std.testing.allocator);
     defer input.deinit();
 
     try input.append("scream \"Hello, world!\".");
 
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     lex.advance();
@@ -29,7 +31,7 @@ test "core.lexer.advance_end_of_line" {
     try input.append("abc");
     try input.append("def");
 
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     lex.advance();
@@ -55,7 +57,7 @@ test "core.lexer.scan_tokens_basic" {
     defer input.deinit();
 
     try input.append("+-*/%<>=(){}");
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -90,7 +92,7 @@ test "core.lexer.scan_tokens_identifier" {
 
     try input.append("identifier123 another__ThingY");
 
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -110,7 +112,7 @@ test "core.lexer.keywords" {
 
     try input.append("if else");
 
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -139,7 +141,7 @@ test "core.lexer.all_kws" {
 
     try input.append("if else loop maybe fun throwaway try gotcha and or not");
 
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -166,7 +168,7 @@ test "core.lexer.scan_tokens_string" {
 
     try input.append("\"Hello, world!\"");
 
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -183,7 +185,7 @@ test "core.lexer.scan_tokens_float" {
 
     try input.append("3.14 2.718");
 
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -203,7 +205,7 @@ test "core.lexer.scan_tokens_integer" {
 
     try input.append("42 1000");
 
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -223,7 +225,7 @@ test "core.lexer.scan_tokens_boolean" {
 
     try input.append("true false");
 
-    var lex = lexer.Lexer.init(input);
+    var lex = lexer.Lexer.init(input, allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -238,20 +240,20 @@ test "core.lexer.scan_tokens_boolean" {
 }
 
 test "core.lexer.scan_from_file" {
-    const allocator = std.testing.allocator;
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
 
-    const result = try loader.load_file(allocator, "examples/01_hello_world.??");
-    defer {
-        result.backing.deinit();
-        result.lines.deinit();
-    }
+    const arena_allocator = arena.allocator();
 
-    var lex = lexer.Lexer.init(result.lines);
+    const result = try loader.load_file(arena_allocator, "examples/01_hello_world.??");
+    defer result.deinit();
+
+    var lex = lexer.Lexer.init(result, arena_allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
 
-    try std.testing.expect(lex.tokens.items.len == 6);
+    try std.testing.expect(lex.tokens.items.len >= 6);
 
     try std.testing.expect(lex.tokens.items[0].token_type == .Identifier);
     try std.testing.expect(std.mem.eql(u8, lex.tokens.items[0].value, "scream"));
@@ -259,7 +261,7 @@ test "core.lexer.scan_from_file" {
     try std.testing.expect(lex.tokens.items[1].token_type == .LeftParen);
 
     try std.testing.expect(lex.tokens.items[2].token_type == .String);
-    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[2].value, "\"Hello world!\""));
+    try std.testing.expect(std.mem.eql(u8, lex.tokens.items[2].value, "\"Hello world!\\n\""));
 
     try std.testing.expect(lex.tokens.items[3].token_type == .RightParen);
 

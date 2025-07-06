@@ -29,13 +29,13 @@ test "basic" {
 
     try arguments.append(Expression{
         .literal = .{
-            .string = "Hello, World!\n",
+            .string = "\"Hello, World!\n\"",
         },
     });
 
-    var statements = std.ArrayList(Statement).init(allocator);
+    var statements = std.ArrayList(*Statement).init(allocator);
 
-    try statements.append(Statement{
+    var stmt1 = Statement{
         .expression = Expression{
             .call = .{
                 .callee = &Expression{
@@ -46,7 +46,9 @@ test "basic" {
                 .arguments = arguments,
             },
         },
-    });
+    };
+
+    try statements.append(&stmt1);
 
     try runner.run(
         statements.items,

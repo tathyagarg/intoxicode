@@ -93,7 +93,6 @@ pub const Expression = union(enum) {
                 defer allocator.free(callee);
 
                 var args = std.ArrayList([]const u8).init(allocator);
-                defer args.deinit();
 
                 for (c.arguments.?.items) |arg| {
                     const arg_str = try arg.pretty_print(allocator);
@@ -146,7 +145,32 @@ pub const Literal = union(enum) {
     pub fn to_string(self: Literal, allocator: std.mem.Allocator) ![]const u8 {
         return switch (self) {
             .number => |n| try std.fmt.allocPrint(allocator, "{d}", .{n}),
-            .string => |s| s,
+            .string => |s| {
+                const removed_quotes = s[1 .. s.len - 1];
+
+                var result = std.ArrayList(u8).init(allocator);
+
+                var i: usize = 0;
+                while (i < removed_quotes.len) : (i += 1) {
+                    const c = removed_quotes[i];
+                    if (c == '\\') {
+                        i += 1;
+                        if (i < removed_quotes.len) {
+                            const next_char = removed_quotes[i];
+                            switch (next_char) {
+                                'n' => try result.append('\n'),
+                                't' => try result.append('\t'),
+                                'r' => try result.append('\r'),
+                                else => try result.append(next_char),
+                            }
+                        }
+                    } else {
+                        try result.append(c);
+                    }
+                }
+
+                return result.toOwnedSlice();
+            },
             .boolean => |b| if (b) "true" else "false",
         };
     }
