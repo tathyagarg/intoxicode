@@ -7,6 +7,7 @@ pub const Expression = union(enum) {
     literal: Literal,
     identifier: Identifier,
     call: Call,
+    null: ?void,
 
     pub fn equals(self: Expression, other: Expression) bool {
         return switch (other) {
@@ -47,6 +48,10 @@ pub const Expression = union(enum) {
                     }
                     return true;
                 },
+                else => false,
+            },
+            .null => switch (self) {
+                .null => true,
                 else => false,
             },
         };
@@ -101,6 +106,7 @@ pub const Expression = union(enum) {
                     .{ callee, args.items.len },
                 );
             },
+            .null => "null",
         };
     }
 
@@ -135,6 +141,14 @@ pub const Literal = union(enum) {
     pub fn number_from_string(s: []const u8) !Literal {
         const number = try std.fmt.parseFloat(f64, s);
         return Literal{ .number = number };
+    }
+
+    pub fn to_string(self: Literal, allocator: std.mem.Allocator) ![]const u8 {
+        return switch (self) {
+            .number => |n| try std.fmt.allocPrint(allocator, "{d}", .{n}),
+            .string => |s| s,
+            .boolean => |b| if (b) "true" else "false",
+        };
     }
 };
 

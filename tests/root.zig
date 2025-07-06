@@ -8,5 +8,7 @@ test "all" {
     _ = @import("core/parser/expressions.zig");
     _ = @import("core/parser/parser.zig");
 
+    _ = @import("core/runner/runner.zig");
+
     _ = @import("runtime/execution.zig");
 }

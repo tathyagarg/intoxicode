@@ -10,4 +10,6 @@ pub const lexer = @import("core/lexer/lexer.zig");
 
 pub const parser = @import("core/parser/parser.zig");
 
+pub const runner = @import("core/runner/runner.zig");
+
 pub const errors = @import("errors.zig");

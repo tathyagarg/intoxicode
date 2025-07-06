@@ -1,41 +1,48 @@
 const std = @import("std");
-const cli = @import("cli/cli.zig");
-const runtime = @import("runtime/runtime.zig");
+
+const Runner = @import("root.zig").runner.Runner;
+const Expression = @import("root.zig").parser.expressions.Expression;
+const Statement = @import("root.zig").parser.statements.Statement;
+const Identifier = @import("root.zig").parser.expressions.Identifier;
 
 pub fn main() !void {
-    const allocator = std.heap.page_allocator;
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
 
-    var parser = cli.Parser.init("my_program", "A simple CLI program", std.heap.page_allocator);
+    const allocator = arena.allocator();
 
-    try parser.add_argument(@constCast(&cli.Argument{
-        .name = "file",
-        .description = "The file to interpret",
-        .option = "--file",
-        .flag = "-F",
-        .positional = true,
-    }));
+    const runner = try Runner.init(allocator);
 
-    try parser.add_argument(@constCast(&cli.Argument{
-        .name = "verbose",
-        .description = "Enable verbose output",
-        .option = "--verbose",
-        .flag = "-v",
-        .has_data = false,
-    }));
+    var statements = std.ArrayList(Statement).init(allocator);
 
-    defer parser.deinit();
+    var arguments = std.ArrayList(Expression).init(allocator);
 
-    parser.parse(std.os.argv) catch {
-        const message = try parser.help(allocator);
-        std.debug.print("{s}\n", .{message});
+    try arguments.append(Expression{
+        .literal = .{
+            .number = 42,
+        },
+    });
 
-        return;
-    };
+    try arguments.append(Expression{
+        .literal = .{
+            .string = "Hello, World!\n",
+        },
+    });
 
-    const file_path = parser.get("file") orelse {
-        std.debug.print("No file specified.\n", .{});
-        return;
-    };
+    statements.append(Statement{
+        .expression = Expression{
+            .call = .{
+                .callee = &Expression{
+                    .identifier = Identifier{
+                        .name = "scream",
+                    },
+                },
+                .arguments = arguments,
+            },
+        },
+    }) catch unreachable;
 
-    _ = try runtime.loader.load_file(allocator, file_path.value.?);
+    try runner.run(
+        statements.items,
+    );
 }
