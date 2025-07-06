@@ -55,6 +55,8 @@ pub const Lexer = struct {
 
     tokens: std.ArrayList(Token),
 
+    allocator: std.mem.Allocator,
+
     pub fn init(input: std.ArrayList([]const u8), allocator: std.mem.Allocator) Lexer {
         const lexer = Lexer{
             .input = input,
@@ -63,6 +65,7 @@ pub const Lexer = struct {
             .position = 0,
             .current_char = 0,
             .tokens = std.ArrayList(Token).init(allocator),
+            .allocator = allocator,
         };
 
         return lexer;
@@ -90,7 +93,16 @@ pub const Lexer = struct {
             '{' => try self.add_token(TokenType.LeftBrace),
             '}' => try self.add_token(TokenType.RightBrace),
             '+' => try self.add_token(TokenType.Plus),
-            '-' => try self.add_token(TokenType.Minus),
+            '-' => {
+                const next = self.peek();
+                if (next >= '0' and next <= '9') {
+                    self.advance();
+                    try self.add_token(try self.number());
+                } else {
+                    // This is a minus operator
+                    try self.add_token(TokenType.Minus);
+                }
+            },
             '*' => try self.add_token(TokenType.Multiply),
             '/' => try self.add_token(TokenType.Divide),
             '%' => try self.add_token(TokenType.Modulo),
@@ -98,6 +110,7 @@ pub const Lexer = struct {
             '>' => try self.add_token(TokenType.GreaterThan),
             '.' => try self.add_token(TokenType.Period),
             '?' => try self.add_token(TokenType.QuestionMark),
+            ',' => try self.add_token(TokenType.Comma),
             '=' => {
                 if (self.peek() == '=') {
                     self.advance(); // Consume the '='
@@ -145,29 +158,7 @@ pub const Lexer = struct {
                 try self.add_token(TokenType.String);
             },
             ' ' => {},
-            '0'...'9' => {
-                var next = self.peek();
-                while (!self.at_end() and next >= '0' and next <= '9' and next != ' ') {
-                    self.advance();
-                    next = self.peek();
-                }
-
-                next = self.peek();
-                const next_to_next = self.peek_next();
-
-                if (next == '.' and (next_to_next >= '0' and next_to_next <= '9')) {
-                    self.advance(); // Consume the '.'
-                    next = self.peek();
-                    while (!self.at_end() and next >= '0' and next <= '9' and next != ' ') {
-                        self.advance();
-                        next = self.peek();
-                    }
-                    try self.add_token(TokenType.Float);
-                } else {
-                    // Integer literal
-                    try self.add_token(TokenType.Integer);
-                }
-            },
+            '0'...'9' => try self.add_token(try self.number()),
             else => {
                 std.debug.print("Unexpected character: '{c}' ({d}) at line {d}, position {d}\n", .{
                     self.current_char,
@@ -179,6 +170,34 @@ pub const Lexer = struct {
                 unreachable; // Handle unexpected characters
             },
         }
+    }
+
+    fn number(self: *Lexer) !TokenType {
+        var next = self.peek();
+        while (!self.at_end() and next >= '0' and next <= '9') {
+            self.advance();
+            next = self.peek();
+        }
+
+        next = self.peek();
+        const next_to_next = self.peek_next();
+
+        var token_type: TokenType = undefined;
+
+        if (next == '.' and (next_to_next >= '0' and next_to_next <= '9')) {
+            self.advance(); // Consume the '.'
+            next = self.peek();
+            while (!self.at_end() and next >= '0' and next <= '9') {
+                self.advance();
+                next = self.peek();
+            }
+
+            token_type = .Float;
+        } else {
+            token_type = .Integer;
+        }
+
+        return token_type;
     }
 
     pub fn add_raw_token(self: *Lexer, token: Token) !void {

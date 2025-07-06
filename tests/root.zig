@@ -10,5 +10,8 @@ test "all" {
 
     _ = @import("core/runner/runner.zig");
 
+    _ = @import("core/stdlib/min.zig");
+    _ = @import("core/stdlib/max.zig");
+
     _ = @import("runtime/execution.zig");
 }

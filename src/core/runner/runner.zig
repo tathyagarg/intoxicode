@@ -4,9 +4,7 @@ const Statement = @import("../parser/parser.zig").statements.Statement;
 const Expression = @import("../parser/parser.zig").expressions.Expression;
 const Literal = @import("../parser/parser.zig").expressions.Literal;
 
-const std_functions = [_][]const u8{
-    "scream",
-};
+const StdFunction = *const fn (Runner, []Expression) anyerror!Expression;
 
 pub const Runner = struct {
     allocator: std.mem.Allocator,
@@ -14,6 +12,8 @@ pub const Runner = struct {
     stderr: std.io.AnyWriter,
 
     variables: *std.StringHashMap(Expression),
+
+    std_functions: std.StringHashMap(StdFunction),
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -23,11 +23,18 @@ pub const Runner = struct {
         const variables = try allocator.create(std.StringHashMap(Expression));
         variables.* = std.StringHashMap(Expression).init(allocator);
 
+        var std_functions = std.StringHashMap(StdFunction).init(allocator);
+        std_functions.putNoClobber("scream", scream) catch unreachable;
+        std_functions.putNoClobber("abs", abs) catch unreachable;
+        std_functions.putNoClobber("min", min) catch unreachable;
+        std_functions.putNoClobber("max", max) catch unreachable;
+
         return Runner{
             .allocator = allocator,
             .variables = variables,
             .stdout = stdout,
             .stderr = stderr,
+            .std_functions = std_functions,
         };
     }
 
@@ -52,7 +59,7 @@ pub const Runner = struct {
         }
     }
 
-    fn evaluate_expression(self: Runner, expr: Expression) !Expression {
+    fn evaluate_expression(self: Runner, expr: Expression) anyerror!Expression {
         return switch (expr) {
             .literal => {
                 return expr;
@@ -61,10 +68,8 @@ pub const Runner = struct {
                 if (self.variables.get(id.name)) |value| {
                     return value;
                 } else {
-                    for (std_functions) |func| {
-                        if (std.mem.eql(u8, id.name, func)) {
-                            return expr;
-                        }
+                    if (self.std_functions.get(id.name) != null) {
+                        return expr;
                     }
 
                     return error.VariableNotFound;
@@ -111,32 +116,98 @@ pub const Runner = struct {
                 switch (callee) {
                     .literal => {
                         return Expression{
-                            .null = null,
+                            .literal = Literal{
+                                .null = null,
+                            },
                         };
                     },
                     .identifier => |id| {
-                        if (std.mem.eql(u8, id.name, "scream")) {
-                            var output = std.ArrayList(u8).init(self.allocator);
+                        const arguments: []Expression = if (call.arguments) |args|
+                            args.items
+                        else
+                            &.{};
 
-                            if (call.arguments != null) {
-                                for (call.arguments.?.items) |arg| {
-                                    const evaluated = try self.evaluate_expression(arg);
-                                    try output.appendSlice(try evaluated.literal.to_string(self.allocator));
-                                }
-                            }
-
-                            try self.stdout.writeAll(output.items);
-                            return Expression{
-                                .null = null,
-                            };
+                        if (self.std_functions.get(id.name)) |func| {
+                            return try func(self, arguments);
                         } else {
-                            return error.UnknownFunction;
+                            return error.FunctionNotFound;
                         }
                     },
                     else => return error.InvalidFunctionCall,
                 }
             },
-            .null => expr,
+        };
+    }
+
+    fn scream(self: Runner, args: []Expression) anyerror!Expression {
+        var output = std.ArrayList(u8).init(self.allocator);
+        for (args) |arg| {
+            const evaluated = try self.evaluate_expression(arg);
+            try output.appendSlice(try evaluated.literal.to_string(self.allocator));
+        }
+        try self.stdout.writeAll(output.items);
+
+        return Expression{
+            .literal = Literal{
+                .null = null,
+            },
+        };
+    }
+
+    fn abs(self: Runner, args: []Expression) anyerror!Expression {
+        if (args.len != 1) {
+            return error.InvalidArgumentCount;
+        }
+
+        const arg = try self.evaluate_expression(args[0]);
+        if (arg.literal.number < 0) {
+            return Expression{
+                .literal = Literal{
+                    .number = -arg.literal.number,
+                },
+            };
+        } else {
+            return arg;
+        }
+    }
+
+    fn min(self: Runner, args: []Expression) anyerror!Expression {
+        if (args.len == 0) {
+            return error.InvalidArgumentCount;
+        }
+
+        var min_value: ?f64 = null;
+        for (args) |arg| {
+            const evaluated = try self.evaluate_expression(arg);
+            if (min_value == null or evaluated.literal.number < min_value.?) {
+                min_value = evaluated.literal.number;
+            }
+        }
+
+        return Expression{
+            .literal = Literal{
+                .number = min_value.?,
+            },
+        };
+    }
+
+    fn max(self: Runner, args: []Expression) anyerror!Expression {
+        if (args.len == 0) {
+            return error.InvalidArgumentCount;
+        }
+
+        var max_value: ?f64 = null;
+        for (args) |arg| {
+            const evaluated = try self.evaluate_expression(arg);
+            if (max_value == null or evaluated.literal.number > max_value.?) {
+                max_value = evaluated.literal.number;
+            }
+        }
+
+        return Expression{
+            .literal = Literal{
+                .number = max_value.?,
+            },
         };
     }
 };

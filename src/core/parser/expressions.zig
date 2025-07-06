@@ -7,7 +7,6 @@ pub const Expression = union(enum) {
     literal: Literal,
     identifier: Identifier,
     call: Call,
-    null: ?void,
 
     pub fn equals(self: Expression, other: Expression) bool {
         return switch (other) {
@@ -30,6 +29,7 @@ pub const Expression = union(enum) {
                         .number => l.number == self_l.number,
                         .string => std.mem.eql(u8, l.string, self_l.string),
                         .boolean => l.boolean == self_l.boolean,
+                        .null => l.null == self_l.null,
                     };
                 },
                 else => false,
@@ -48,10 +48,6 @@ pub const Expression = union(enum) {
                     }
                     return true;
                 },
-                else => false,
-            },
-            .null => switch (self) {
-                .null => true,
                 else => false,
             },
         };
@@ -86,6 +82,7 @@ pub const Expression = union(enum) {
                 .number => try std.fmt.allocPrint(allocator, "Literal(number = {d})", .{self.literal.number}),
                 .string => try std.fmt.allocPrint(allocator, "Literal(string = {s})", .{self.literal.string}),
                 .boolean => if (self.literal.boolean) "true" else "false",
+                .null => "null",
             },
             .identifier => self.identifier.pretty_print(allocator),
             .call => |c| {
@@ -105,7 +102,6 @@ pub const Expression = union(enum) {
                     .{ callee, args.items.len },
                 );
             },
-            .null => "null",
         };
     }
 
@@ -136,9 +132,9 @@ pub const Literal = union(enum) {
     number: f64,
     string: []const u8,
     boolean: bool,
+    null: ?void,
 
     pub fn number_from_string(s: []const u8) !Literal {
-        std.debug.print("Parsing number from string: {s}\n", .{s});
         const number = try std.fmt.parseFloat(f64, s);
         return Literal{ .number = number };
     }
@@ -173,6 +169,7 @@ pub const Literal = union(enum) {
                 return result.toOwnedSlice();
             },
             .boolean => |b| if (b) "true" else "false",
+            .null => "null",
         };
     }
 };

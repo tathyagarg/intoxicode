@@ -1,6 +1,1 @@
-sigma = "hi".
 scream("Hello world!\n").
-scream("Bye world!\n").
-scream(sigma).
-scream("\n").
-
