@@ -146,14 +146,21 @@ pub const Lexer = struct {
             },
             ' ' => {},
             '0'...'9' => {
-                while (!self.at_end() and self.current_char >= '0' and self.current_char <= '9' and self.peek() != ';' and self.peek() != ' ') {
+                var next = self.peek();
+                while (!self.at_end() and next >= '0' and next <= '9' and next != ' ') {
                     self.advance();
+                    next = self.peek();
                 }
 
-                if (self.current_char == '.' and (self.peek() >= '0' and self.peek() <= '9')) {
+                next = self.peek();
+                const next_to_next = self.peek_next();
+
+                if (next == '.' and (next_to_next >= '0' and next_to_next <= '9')) {
                     self.advance(); // Consume the '.'
-                    while (!self.at_end() and self.current_char >= '0' and self.current_char <= '9' and self.peek() != ';' and self.peek() != ' ') {
+                    next = self.peek();
+                    while (!self.at_end() and next >= '0' and next <= '9' and next != ' ') {
                         self.advance();
+                        next = self.peek();
                     }
                     try self.add_token(TokenType.Float);
                 } else {

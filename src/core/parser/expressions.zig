@@ -138,6 +138,7 @@ pub const Literal = union(enum) {
     boolean: bool,
 
     pub fn number_from_string(s: []const u8) !Literal {
+        std.debug.print("Parsing number from string: {s}\n", .{s});
         const number = try std.fmt.parseFloat(f64, s);
         return Literal{ .number = number };
     }
