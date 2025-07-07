@@ -5,6 +5,8 @@ const Parser = @import("root.zig").parser.Parser;
 const Lexer = @import("root.zig").lexer.Lexer;
 const loader = @import("root.zig").loader;
 
+const cli = @import("root.zig").cli;
+
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -14,7 +16,19 @@ pub fn main() !void {
     var stdout = std.io.getStdOut().writer();
     var stderr = std.io.getStdErr().writer();
 
-    const data = try loader.load_file(allocator, "examples/06_exceptions.??");
+    var cli_parser = cli.Parser.init("intoxicode", "Run drunk code.", allocator);
+
+    var input_file = cli.Argument{
+        .name = "file",
+        .description = "The intoxicode file to run.",
+        .option = "--file",
+        .flag = "-f",
+    };
+
+    try cli_parser.add_argument(&input_file);
+    try cli_parser.parse(std.os.argv);
+
+    const data = try loader.load_file(allocator, cli_parser.arguments.get("file").?.value orelse return error.InvalidArgument);
     var lexer = Lexer.init(data, allocator);
 
     try lexer.scan_tokens();
