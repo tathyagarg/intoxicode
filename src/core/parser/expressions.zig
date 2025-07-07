@@ -7,6 +7,7 @@ pub const Expression = union(enum) {
     literal: Literal,
     identifier: Identifier,
     call: Call,
+    indexing: Indexing,
 
     pub fn equals(self: Expression, other: Expression) bool {
         return switch (other) {
@@ -123,6 +124,17 @@ pub const Expression = union(enum) {
                     .{ callee, args.items.len },
                 );
             },
+            .indexing => |i| {
+                const array_str = try i.array.pretty_print(allocator);
+
+                const index_str = try i.index.pretty_print(allocator);
+
+                return try std.fmt.allocPrint(
+                    allocator,
+                    "Indexing({s}[{s}])",
+                    .{ array_str, index_str },
+                );
+            },
         };
     }
 
@@ -145,6 +157,7 @@ pub const Expression = union(enum) {
             .literal => 1.0, // literals are always certain
             .identifier => self.identifier.certainty,
             .call => self.call.certainty,
+            .indexing => 1.0,
         };
     }
 
@@ -152,9 +165,9 @@ pub const Expression = union(enum) {
         switch (self.*) {
             .binary => |*b| b.certainty = certainty,
             .grouping => |*g| g.certainty = certainty,
-            .literal => {},
             .identifier => |*id| id.certainty = certainty,
             .call => |*c| c.certainty = certainty,
+            .literal, .indexing => {},
         }
     }
 };
@@ -252,5 +265,15 @@ pub const Call = struct {
     pub fn deinit(self: Call) void {
         for (self.arguments.items) |arg| arg.deinit();
         self.arguments.deinit();
+    }
+};
+
+pub const Indexing = struct {
+    array: *const Expression,
+    index: *const Expression,
+
+    pub fn deinit(self: Indexing) void {
+        self.array.deinit();
+        self.index.deinit();
     }
 };

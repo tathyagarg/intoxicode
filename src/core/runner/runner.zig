@@ -81,8 +81,21 @@ pub const Runner = struct {
 
     fn evaluate_expression(self: Runner, expr: Expression) anyerror!Expression {
         return switch (expr) {
-            .literal => {
-                return expr;
+            .literal => expr,
+            .indexing => |indexing| {
+                const array_expr = try self.evaluate_expression(indexing.array.*);
+                const index_expr = try self.evaluate_expression(indexing.index.*);
+
+                const array = array_expr.literal.array;
+                const index = @as(usize, @intFromFloat(index_expr.literal.number));
+
+                if (index < array.items.len) {
+                    return Expression{
+                        .literal = (try self.evaluate_expression(array.items[index])).literal,
+                    };
+                } else {
+                    return error.IndexOutOfBounds;
+                }
             },
             .identifier => |id| {
                 if (self.variables.get(id.name)) |value| {

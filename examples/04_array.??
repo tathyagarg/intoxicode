@@ -1,2 +1,2 @@
 nums = [1, "meow", 1 + 2].
-scream(nums).
+scream(nums[1]).

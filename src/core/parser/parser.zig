@@ -415,13 +415,13 @@ pub const Parser = struct {
     }
 
     fn factor(self: *Parser) !Expression {
-        var expr = try self.call();
+        var expr = try self.indexing();
 
         while (self.match(&[_]TokenType{ .Multiply, .Divide })) {
             const operator = self.previous();
 
             const right = try self.allocator.create(Expression);
-            right.* = try self.call();
+            right.* = try self.indexing();
 
             const left = try self.allocator.create(Expression);
             left.* = expr;
@@ -431,6 +431,31 @@ pub const Parser = struct {
                     .left = left,
                     .operator = operator,
                     .right = right,
+                },
+            };
+        }
+
+        return expr;
+    }
+
+    fn indexing(self: *Parser) !Expression {
+        var expr = try self.call();
+
+        while (self.match(&[_]TokenType{.LeftBracket})) {
+            const index_expr = try self.expression();
+
+            const index = try self.allocator.create(Expression);
+            index.* = index_expr;
+
+            _ = try self.consume(.RightBracket, "Expected ']' after index expression.");
+
+            const array = try self.allocator.create(Expression);
+            array.* = expr;
+
+            expr = Expression{
+                .indexing = expressions.Indexing{
+                    .array = array,
+                    .index = index,
                 },
             };
         }
