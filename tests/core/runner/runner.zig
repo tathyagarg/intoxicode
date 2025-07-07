@@ -56,7 +56,7 @@ test "basic" {
 
     try std.testing.expectEqualStrings(
         "42Hello, World!\n",
-        stdout.items,
+        stdout.items[0..16],
     );
 }
 
@@ -116,6 +116,6 @@ test "variables" {
 
     try std.testing.expectEqualStrings(
         "10",
-        stdout.items,
+        stdout.items[0..2],
     );
 }

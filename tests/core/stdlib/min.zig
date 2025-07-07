@@ -33,6 +33,6 @@ test "min" {
 
     try std.testing.expectEqualStrings(
         "1",
-        stdout.items,
+        stdout.items[0..1],
     );
 }

@@ -306,6 +306,39 @@ pub const Parser = struct {
     }
 
     fn expression(self: *Parser) error{ OutOfMemory, InvalidCharacter }!Expression {
+        if (self.match(&[_]TokenType{.LeftParen})) {
+            const expr = try self.allocator.create(Expression);
+            expr.* = try self.expression();
+
+            _ = try self.consume(.RightParen, "Expected ')' after expression.");
+
+            return Expression{
+                .grouping = expressions.Grouping{
+                    .expression = expr,
+                },
+            };
+        }
+
+        if (self.match(&[_]TokenType{.LeftBracket})) {
+            const elements = try self.allocator.create(std.ArrayList(Expression));
+            elements.* = std.ArrayList(Expression).init(self.allocator);
+
+            while (!self.is_at_end() and !self.check(.RightBracket)) {
+                const element = try self.expression();
+                try elements.append(element);
+
+                if (!self.match(&[_]TokenType{.Comma})) break;
+            }
+
+            _ = try self.consume(.RightBracket, "Expected ']' after array elements.");
+
+            return Expression{
+                .literal = expressions.Literal{
+                    .array = elements.*,
+                },
+            };
+        }
+
         return try self.equality();
     }
 

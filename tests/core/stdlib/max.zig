@@ -33,6 +33,6 @@ test "max" {
 
     try std.testing.expectEqualStrings(
         "2",
-        stdout.items,
+        stdout.items[0..1],
     );
 }

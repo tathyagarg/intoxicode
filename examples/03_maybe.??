@@ -1,1 +1,1 @@
-scream("Hello, world!")?
+scream("Hello, world!\n")?

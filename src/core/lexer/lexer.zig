@@ -10,20 +10,20 @@ const Pair = struct {
 };
 
 pub const Keywords = [_]Pair{
-    .{ .key = "if", .value = TokenType.If },
-    .{ .key = "else", .value = TokenType.Else },
-    .{ .key = "loop", .value = TokenType.Loop },
-    .{ .key = "maybe", .value = TokenType.Maybe },
-    .{ .key = "fun", .value = TokenType.Fun },
-    .{ .key = "throwaway", .value = TokenType.Throwaway },
-    .{ .key = "try", .value = TokenType.Try },
-    .{ .key = "gotcha", .value = TokenType.Gotcha },
-    .{ .key = "and", .value = TokenType.And },
-    .{ .key = "or", .value = TokenType.Or },
-    .{ .key = "not", .value = TokenType.Not },
-    .{ .key = "null", .value = TokenType.Null },
-    .{ .key = "true", .value = TokenType.Boolean },
-    .{ .key = "false", .value = TokenType.Boolean },
+    .{ .key = "if", .value = .If },
+    .{ .key = "else", .value = .Else },
+    .{ .key = "loop", .value = .Loop },
+    .{ .key = "puke", .value = .Puke },
+    .{ .key = "fun", .value = .Fun },
+    .{ .key = "throwaway", .value = .Throwaway },
+    .{ .key = "try", .value = .Try },
+    .{ .key = "gotcha", .value = .Gotcha },
+    .{ .key = "and", .value = .And },
+    .{ .key = "or", .value = .Or },
+    .{ .key = "not", .value = .Not },
+    .{ .key = "null", .value = .Null },
+    .{ .key = "true", .value = .Boolean },
+    .{ .key = "false", .value = .Boolean },
 };
 
 pub fn is_keyword(token: []const u8) bool {
@@ -90,6 +90,8 @@ pub const Lexer = struct {
             ')' => try self.add_token(TokenType.RightParen),
             '{' => try self.add_token(TokenType.LeftBrace),
             '}' => try self.add_token(TokenType.RightBrace),
+            '[' => try self.add_token(TokenType.LeftBracket),
+            ']' => try self.add_token(TokenType.RightBracket),
             '+' => try self.add_token(TokenType.Plus),
             '-' => {
                 const next = self.peek();

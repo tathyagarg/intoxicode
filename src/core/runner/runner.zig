@@ -51,25 +51,29 @@ pub const Runner = struct {
             const roll = std.crypto.random.float(f32);
 
             if (roll <= certainty) {
-                switch (statement.*) {
-                    .assignment => |assignment| {
-                        const key = assignment.identifier;
-                        const value = try self.evaluate_expression(assignment.expression);
+                const repetition = std.math.log10(std.math.maxInt(u16)) - std.math.log10(std.crypto.random.int(u16)) + 1;
 
-                        try self.variables.put(key, value);
-                    },
-                    .expression => |expr| {
-                        _ = try self.evaluate_expression(expr);
-                    },
-                    .if_statement => |if_stmt| {
-                        const condition = try self.evaluate_expression(if_stmt.condition);
-                        if (condition.literal.boolean) {
-                            try self.run(if_stmt.then_branch.items);
-                        } else if (if_stmt.else_branch) |else_branch| {
-                            try self.run(else_branch.items);
-                        }
-                    },
-                    else => {},
+                for (0..repetition) |_| {
+                    switch (statement.*) {
+                        .assignment => |assignment| {
+                            const key = assignment.identifier;
+                            const value = try self.evaluate_expression(assignment.expression);
+
+                            try self.variables.put(key, value);
+                        },
+                        .expression => |expr| {
+                            _ = try self.evaluate_expression(expr);
+                        },
+                        .if_statement => |if_stmt| {
+                            const condition = try self.evaluate_expression(if_stmt.condition);
+                            if (condition.literal.boolean) {
+                                try self.run(if_stmt.then_branch.items);
+                            } else if (if_stmt.else_branch) |else_branch| {
+                                try self.run(else_branch.items);
+                            }
+                        },
+                        else => {},
+                    }
                 }
             }
         }

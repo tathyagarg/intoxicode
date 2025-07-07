@@ -30,6 +30,13 @@ pub const Expression = union(enum) {
                         .string => std.mem.eql(u8, l.string, self_l.string),
                         .boolean => l.boolean == self_l.boolean,
                         .null => l.null == self_l.null,
+                        .array => |arr| {
+                            if (l.array.items.len != arr.items.len) return false;
+                            for (l.array.items, arr.items) |item, other_item| {
+                                if (!item.equals(other_item)) return false;
+                            }
+                            return true;
+                        },
                     };
                 },
                 else => false,
@@ -83,6 +90,20 @@ pub const Expression = union(enum) {
                 .string => try std.fmt.allocPrint(allocator, "Literal(string = {s})", .{self.literal.string}),
                 .boolean => if (self.literal.boolean) "true" else "false",
                 .null => "null",
+                .array => |arr| {
+                    var items = std.ArrayList([]const u8).init(allocator);
+                    for (arr.items) |item| {
+                        const item_str = try item.pretty_print(allocator);
+                        try items.append(item_str);
+                    }
+                    const result = try std.fmt.allocPrint(
+                        allocator,
+                        "Literal(array = [{s}])",
+                        .{try std.mem.join(allocator, ", ", items.items)},
+                    );
+                    items.deinit();
+                    return result;
+                },
             },
             .identifier => self.identifier.pretty_print(allocator),
             .call => |c| {
@@ -157,6 +178,7 @@ pub const Literal = union(enum) {
     string: []const u8,
     boolean: bool,
     null: ?void,
+    array: std.ArrayList(Expression),
 
     pub fn number_from_string(s: []const u8) !Literal {
         const number = try std.fmt.parseFloat(f32, s);
@@ -194,6 +216,17 @@ pub const Literal = union(enum) {
             },
             .boolean => |b| if (b) "true" else "false",
             .null => "null",
+            .array => |arr| {
+                var result = std.ArrayList(u8).init(allocator);
+                try result.append('[');
+                for (arr.items) |item| {
+                    const item_str = try item.pretty_print(allocator);
+                    try result.appendSlice(item_str);
+                    try result.appendSlice(", ");
+                }
+                try result.append(']');
+                return result.toOwnedSlice();
+            },
         };
     }
 };

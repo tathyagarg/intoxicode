@@ -4,6 +4,9 @@ pub const TokenType = enum {
     LeftParen,
     RightParen,
 
+    LeftBracket,
+    RightBracket,
+
     LeftBrace,
     RightBrace,
 
@@ -36,8 +39,7 @@ pub const TokenType = enum {
     Else,
 
     Loop,
-
-    Maybe,
+    Puke,
 
     Fun,
     Throwaway, // return
