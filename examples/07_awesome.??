@@ -1,0 +1,9 @@
+fun square(x) {
+    throwaway (x * x ).
+}.
+
+fun addone(x) {
+    throwaway ( x + 1 ).
+}.
+
+scream(addone(square(2))).

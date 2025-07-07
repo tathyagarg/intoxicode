@@ -25,10 +25,23 @@ pub fn main() !void {
         .flag = "-f",
     };
 
+    var content = cli.Argument{
+        .name = "content",
+        .description = "The intoxicode content to run.",
+        .option = "--content",
+        .flag = "-c",
+    };
+
     try cli_parser.add_argument(&input_file);
+    try cli_parser.add_argument(&content);
+
     try cli_parser.parse(std.os.argv);
 
-    const data = try loader.load_file(allocator, cli_parser.arguments.get("file").?.value orelse return error.InvalidArgument);
+    const data = if (cli_parser.arguments.get("file").?.value == null)
+        cli_parser.arguments.get("content").?.value.?
+    else
+        try loader.load_file(allocator, cli_parser.arguments.get("file").?.value.?);
+
     var lexer = Lexer.init(data, allocator);
 
     try lexer.scan_tokens();
