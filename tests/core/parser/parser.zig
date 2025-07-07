@@ -120,3 +120,31 @@ test "core.parser.parser.function_call" {
         ),
     );
 }
+
+test "if" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const allocator = arena.allocator();
+
+    var tokens = std.ArrayList(Token).init(std.testing.allocator);
+    defer tokens.deinit();
+
+    try tokens.append(Token{ .token_type = .If, .value = "if" });
+    try tokens.append(Token{ .token_type = .Identifier, .value = "1" });
+    try tokens.append(Token{ .token_type = .GreaterThan, .value = ">" });
+    try tokens.append(Token{ .token_type = .Identifier, .value = "0" });
+    try tokens.append(Token{ .token_type = .LeftBrace, .value = "{" });
+    try tokens.append(Token{ .token_type = .Identifier, .value = "scream" });
+    try tokens.append(Token{ .token_type = .LeftParen, .value = "(" });
+    try tokens.append(Token{ .token_type = .String, .value = "\"Hello, World!\"" });
+    try tokens.append(Token{ .token_type = .RightParen, .value = ")" });
+    try tokens.append(Token{ .token_type = .Period, .value = "." });
+    try tokens.append(Token{ .token_type = .RightBrace, .value = "}" });
+    try tokens.append(Token{ .token_type = .Period, .value = "." });
+    try tokens.append(Token{ .token_type = .EOF, .value = "" });
+
+    var p = Parser.init(tokens, allocator);
+    const statements = try p.parse();
+    defer statements.deinit();
+}

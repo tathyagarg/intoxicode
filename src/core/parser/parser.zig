@@ -99,7 +99,7 @@ pub const Parser = struct {
         const certainty: f32 = switch (next.token_type) {
             .Period => 1.0,
             .QuestionMark => 0.75,
-            else => unreachable,
+            else => std.debug.panic("Unexpected token after statement: {s}", .{next.value}),
         };
 
         switch (found_stmt.*) {
@@ -121,7 +121,6 @@ pub const Parser = struct {
     }
 
     fn assignment_or_expression(self: *Parser) !*Statement {
-        //const previous_token = self.previous();
         const identifier = self.previous().value;
 
         if (self.match(&[_]TokenType{.Assignment})) {
@@ -177,23 +176,29 @@ pub const Parser = struct {
     fn if_statement(self: *Parser) !*Statement {
         const condition = try self.expression();
 
-        var then_branch = std.ArrayList(*Statement).init(self.allocator);
-        defer then_branch.deinit();
+        _ = try self.consume(.LeftBrace, "Expected '{' after 'if'.");
 
-        while (!self.is_at_end() and !self.check(.Else)) {
+        var then_branch = std.ArrayList(*Statement).init(self.allocator);
+
+        while (!self.is_at_end() and !self.check(.RightBrace)) {
             const stmt = try self.statement();
             try then_branch.append(stmt);
         }
 
+        _ = try self.consume(.RightBrace, "Expected '}' to end 'if' block.");
+
         var else_branch: ?std.ArrayList(*Statement) = null;
         if (self.match(&[_]TokenType{.Else})) {
-            else_branch = std.ArrayList(*Statement).init(self.allocator);
-            defer else_branch.?.deinit();
+            _ = try self.consume(.LeftBrace, "Expected '{' after 'if'.");
 
-            while (!self.is_at_end()) {
+            else_branch = std.ArrayList(*Statement).init(self.allocator);
+
+            while (!self.is_at_end() and !self.check(.RightBrace)) {
                 const stmt = try self.statement();
                 try else_branch.?.append(stmt);
             }
+
+            _ = try self.consume(.RightBrace, "Expected '}' to end 'if' block.");
         }
 
         const stmt = try self.allocator.create(Statement);

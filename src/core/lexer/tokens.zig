@@ -58,13 +58,10 @@ pub const Token = struct {
     token_type: TokenType,
     value: []const u8,
 
-    line: usize = 0,
-
-    pub fn init(token_type: TokenType, value: []const u8, line: usize) Token {
+    pub fn init(token_type: TokenType, value: []const u8) Token {
         return Token{
             .token_type = token_type,
             .value = value,
-            .line = line,
         };
     }
 

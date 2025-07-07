@@ -47,6 +47,27 @@ pub const Statement = union(enum) {
             .throwaway_statement => |*t| t.certainty = certainty,
         }
     }
+
+    pub fn pretty_print(self: Statement, allocator: std.mem.Allocator) ![]const u8 {
+        return switch (self) {
+            .expression => self.expression.pretty_print(allocator),
+            .assignment => |a| {
+                var builder = std.ArrayList(u8).init(allocator);
+
+                try builder.appendSlice(a.identifier);
+                try builder.appendSlice(" = ");
+
+                const expr_str = try a.expression.pretty_print(allocator);
+                try builder.appendSlice(expr_str);
+
+                try builder.appendSlice(";\n");
+
+                return try builder.toOwnedSlice();
+            },
+            .if_statement => self.if_statement.pretty_print(allocator),
+            else => unreachable,
+        };
+    }
 };
 
 pub const Assignment = struct {
@@ -75,6 +96,24 @@ pub const IfStatement = struct {
             for (else_branch.items) |s| s.deinit();
             else_branch.deinit();
         }
+    }
+
+    pub fn pretty_print(self: IfStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
+        var builder = std.ArrayList(u8).init(allocator);
+        defer builder.deinit();
+
+        try builder.appendSlice(try std.fmt.allocPrint(allocator, "if ({s}) {{\n", .{try self.condition.pretty_print(allocator)}));
+        for (self.then_branch.items) |s| {
+            try builder.appendSlice("    ");
+            try builder.appendSlice(try s.pretty_print(allocator));
+            try builder.appendSlice("\n");
+        }
+
+        try builder.appendSlice("}\n");
+
+        // finally get the combined buffer
+        const result = try builder.toOwnedSlice();
+        return result;
     }
 };
 

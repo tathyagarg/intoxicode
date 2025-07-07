@@ -14,13 +14,15 @@ pub fn main() !void {
     var stdout = std.io.getStdOut().writer();
     var stderr = std.io.getStdErr().writer();
 
-    const data = try loader.load_file(allocator, "examples/01_hello_world.??");
+    const data = try loader.load_file(allocator, "examples/02_branch.??");
     var lexer = Lexer.init(data, allocator);
 
     try lexer.scan_tokens();
 
     var parser = Parser.init(lexer.tokens, allocator);
     const statements = try parser.parse();
+
+    // std.debug.print("Parsed statements:\n\n{s}\n", .{try statements.items[0].pretty_print(allocator)});
 
     const runner = try Runner.init(allocator, stdout.any(), stderr.any());
 

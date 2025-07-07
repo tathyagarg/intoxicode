@@ -6,6 +6,8 @@ const Literal = @import("../parser/parser.zig").expressions.Literal;
 
 const StdFunction = *const fn (Runner, []Expression) anyerror!Expression;
 
+const stdlib = @import("stdlib.zig");
+
 pub const Runner = struct {
     allocator: std.mem.Allocator,
     stdout: std.io.AnyWriter,
@@ -24,10 +26,11 @@ pub const Runner = struct {
         variables.* = std.StringHashMap(Expression).init(allocator);
 
         var std_functions = std.StringHashMap(StdFunction).init(allocator);
-        std_functions.putNoClobber("scream", scream) catch unreachable;
-        std_functions.putNoClobber("abs", abs) catch unreachable;
-        std_functions.putNoClobber("min", min) catch unreachable;
-        std_functions.putNoClobber("max", max) catch unreachable;
+        std_functions.putNoClobber("scream", stdlib.scream) catch unreachable;
+        std_functions.putNoClobber("abs", stdlib.abs) catch unreachable;
+        std_functions.putNoClobber("min", stdlib.min) catch unreachable;
+        std_functions.putNoClobber("max", stdlib.max) catch unreachable;
+        std_functions.putNoClobber("pow", stdlib.pow) catch unreachable;
 
         return Runner{
             .allocator = allocator,
@@ -53,6 +56,14 @@ pub const Runner = struct {
                 },
                 .expression => |expr| {
                     _ = try self.evaluate_expression(expr);
+                },
+                .if_statement => |if_stmt| {
+                    const condition = try self.evaluate_expression(if_stmt.condition);
+                    if (condition.literal.boolean) {
+                        try self.run(if_stmt.then_branch.items);
+                    } else if (if_stmt.else_branch) |else_branch| {
+                        try self.run(else_branch.items);
+                    }
                 },
                 else => {},
             }
@@ -105,6 +116,36 @@ pub const Runner = struct {
                             },
                         };
                     },
+                    .Equal => return Expression{
+                        .literal = Literal{
+                            .boolean = left.literal.number == right.literal.number,
+                        },
+                    },
+                    .NotEqual => return Expression{
+                        .literal = Literal{
+                            .boolean = left.literal.number != right.literal.number,
+                        },
+                    },
+                    .GreaterThan => return Expression{
+                        .literal = Literal{
+                            .boolean = left.literal.number > right.literal.number,
+                        },
+                    },
+                    .LessThan => return Expression{
+                        .literal = Literal{
+                            .boolean = left.literal.number < right.literal.number,
+                        },
+                    },
+                    .Or => return Expression{
+                        .literal = Literal{
+                            .boolean = left.literal.boolean or right.literal.boolean,
+                        },
+                    },
+                    .And => return Expression{
+                        .literal = Literal{
+                            .boolean = left.literal.boolean and right.literal.boolean,
+                        },
+                    },
                     else => return error.InvalidBinaryOperation,
                 }
             },
@@ -122,91 +163,23 @@ pub const Runner = struct {
                         };
                     },
                     .identifier => |id| {
-                        const arguments: []Expression = if (call.arguments) |args|
-                            args.items
-                        else
-                            &.{};
+                        var arguments: std.ArrayList(Expression) = std.ArrayList(Expression).init(self.allocator);
+
+                        if (call.arguments != null) {
+                            for (call.arguments.?.items) |arg| {
+                                const evaluated = try self.evaluate_expression(arg);
+                                try arguments.append(evaluated);
+                            }
+                        }
 
                         if (self.std_functions.get(id.name)) |func| {
-                            return try func(self, arguments);
+                            return try func(self, arguments.items);
                         } else {
                             return error.FunctionNotFound;
                         }
                     },
                     else => return error.InvalidFunctionCall,
                 }
-            },
-        };
-    }
-
-    fn scream(self: Runner, args: []Expression) anyerror!Expression {
-        var output = std.ArrayList(u8).init(self.allocator);
-        for (args) |arg| {
-            const evaluated = try self.evaluate_expression(arg);
-            try output.appendSlice(try evaluated.literal.to_string(self.allocator));
-        }
-        try self.stdout.writeAll(output.items);
-
-        return Expression{
-            .literal = Literal{
-                .null = null,
-            },
-        };
-    }
-
-    fn abs(self: Runner, args: []Expression) anyerror!Expression {
-        if (args.len != 1) {
-            return error.InvalidArgumentCount;
-        }
-
-        const arg = try self.evaluate_expression(args[0]);
-        if (arg.literal.number < 0) {
-            return Expression{
-                .literal = Literal{
-                    .number = -arg.literal.number,
-                },
-            };
-        } else {
-            return arg;
-        }
-    }
-
-    fn min(self: Runner, args: []Expression) anyerror!Expression {
-        if (args.len == 0) {
-            return error.InvalidArgumentCount;
-        }
-
-        var min_value: ?f64 = null;
-        for (args) |arg| {
-            const evaluated = try self.evaluate_expression(arg);
-            if (min_value == null or evaluated.literal.number < min_value.?) {
-                min_value = evaluated.literal.number;
-            }
-        }
-
-        return Expression{
-            .literal = Literal{
-                .number = min_value.?,
-            },
-        };
-    }
-
-    fn max(self: Runner, args: []Expression) anyerror!Expression {
-        if (args.len == 0) {
-            return error.InvalidArgumentCount;
-        }
-
-        var max_value: ?f64 = null;
-        for (args) |arg| {
-            const evaluated = try self.evaluate_expression(arg);
-            if (max_value == null or evaluated.literal.number > max_value.?) {
-                max_value = evaluated.literal.number;
-            }
-        }
-
-        return Expression{
-            .literal = Literal{
-                .number = max_value.?,
             },
         };
     }

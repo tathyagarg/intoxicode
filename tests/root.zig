@@ -12,6 +12,7 @@ test "all" {
 
     _ = @import("core/stdlib/min.zig");
     _ = @import("core/stdlib/max.zig");
+    _ = @import("core/stdlib/pow.zig");
 
     _ = @import("runtime/execution.zig");
 }

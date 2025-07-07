@@ -6,12 +6,7 @@ const loader = @import("intoxicode").loader;
 const allocator = std.testing.allocator;
 
 test "core.lexer.advance" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("scream \"Hello, world!\".");
-
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("scream \"Hello, World!\".", allocator);
     defer lex.deinit();
 
     lex.advance();
@@ -25,13 +20,7 @@ test "core.lexer.advance" {
 }
 
 test "core.lexer.advance_end_of_line" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("abc");
-    try input.append("def");
-
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("abc def", allocator);
     defer lex.deinit();
 
     lex.advance();
@@ -39,7 +28,6 @@ test "core.lexer.advance_end_of_line" {
     lex.advance();
 
     try std.testing.expect(lex.current_char == 'c');
-    try std.testing.expect(lex.line_number == 0);
     try std.testing.expect(lex.position == 3);
 
     lex.advance();
@@ -48,16 +36,11 @@ test "core.lexer.advance_end_of_line" {
     lex.advance();
 
     try std.testing.expect(lex.current_char == 'f');
-    try std.testing.expect(lex.line_number == 1);
-    try std.testing.expect(lex.position == 3);
+    try std.testing.expect(lex.position == 7);
 }
 
 test "core.lexer.scan_tokens_basic" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("+-*/%<>=(){}");
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("+-*/%<>=(){}", allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -82,17 +65,11 @@ test "core.lexer.scan_tokens_basic" {
 
     for (expected_types, 0..) |expected_type, i| {
         try std.testing.expect(lex.tokens.items[i].token_type == expected_type);
-        try std.testing.expect(lex.tokens.items[i].line == 0);
     }
 }
 
 test "core.lexer.scan_tokens_identifier" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("identifier123 another__ThingY");
-
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("identifier123 another__ThingY", allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -107,12 +84,7 @@ test "core.lexer.scan_tokens_identifier" {
 }
 
 test "core.lexer.keywords" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("if else");
-
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("if else", allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -136,12 +108,7 @@ test "core.lexer.keywords" {
 }
 
 test "core.lexer.all_kws" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("if else loop maybe fun throwaway try gotcha and or not");
-
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("if else loop maybe fun throwaway try gotcha and or not", allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -163,12 +130,7 @@ test "core.lexer.all_kws" {
 }
 
 test "core.lexer.scan_tokens_string" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("\"Hello, world!\"");
-
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("\"Hello, world!\"", allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -180,12 +142,7 @@ test "core.lexer.scan_tokens_string" {
 }
 
 test "core.lexer.scan_tokens_float" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("3.14 2.718");
-
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("3.14 2.718", allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -200,12 +157,7 @@ test "core.lexer.scan_tokens_float" {
 }
 
 test "core.lexer.scan_tokens_integer" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("42 1000");
-
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("42 1000", allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -220,12 +172,7 @@ test "core.lexer.scan_tokens_integer" {
 }
 
 test "core.lexer.scan_tokens_boolean" {
-    var input = std.ArrayList([]const u8).init(std.testing.allocator);
-    defer input.deinit();
-
-    try input.append("true false");
-
-    var lex = lexer.Lexer.init(input, allocator);
+    var lex = lexer.Lexer.init("true false", allocator);
     defer lex.deinit();
 
     try lex.scan_tokens();
@@ -246,7 +193,6 @@ test "core.lexer.scan_from_file" {
     const arena_allocator = arena.allocator();
 
     const result = try loader.load_file(arena_allocator, "examples/01_hello_world.??");
-    defer result.deinit();
 
     var lex = lexer.Lexer.init(result, arena_allocator);
     defer lex.deinit();

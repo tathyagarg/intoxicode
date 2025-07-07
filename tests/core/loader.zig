@@ -9,7 +9,7 @@ test "core.loader.load_file" {
     const allocator = arena.allocator();
 
     const result = try loader.load_file(allocator, "examples/01_hello_world.??");
-    result.deinit();
+    allocator.free(result);
 }
 
 test "core.loader.nonexistent_file" {

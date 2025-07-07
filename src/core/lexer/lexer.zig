@@ -45,9 +45,8 @@ pub fn get_keyword_type(token: []const u8) ?TokenType {
 }
 
 pub const Lexer = struct {
-    input: std.ArrayList([]const u8),
+    input: []const u8,
 
-    line_number: usize,
     start_position: usize,
     position: usize,
 
@@ -57,10 +56,9 @@ pub const Lexer = struct {
 
     allocator: std.mem.Allocator,
 
-    pub fn init(input: std.ArrayList([]const u8), allocator: std.mem.Allocator) Lexer {
+    pub fn init(input: []const u8, allocator: std.mem.Allocator) Lexer {
         const lexer = Lexer{
             .input = input,
-            .line_number = 0,
             .start_position = 0,
             .position = 0,
             .current_char = 0,
@@ -81,7 +79,7 @@ pub const Lexer = struct {
             try self.scan_token();
         }
 
-        try self.add_raw_token(Token.init(TokenType.EOF, "", self.line_number));
+        try self.add_raw_token(Token.init(TokenType.EOF, ""));
     }
 
     pub fn scan_token(self: *Lexer) !void {
@@ -157,16 +155,20 @@ pub const Lexer = struct {
 
                 try self.add_token(TokenType.String);
             },
-            ' ' => {},
             '0'...'9' => try self.add_token(try self.number()),
+            ' ', '\n', '\r', '\t' => {}, // Ignore whitespace
             else => {
-                std.debug.print("Unexpected character: '{c}' ({d}) at line {d}, position {d}\n", .{
+                std.debug.print("Input: {s}\n", .{self.input});
+
+                for (self.tokens.items) |token| {
+                    std.debug.print("Token: {s} ({})\n", .{ token.value, token.token_type });
+                }
+
+                std.debug.print("Unexpected character: '{c}' ({d}) at line, position {d}\n", .{
                     self.current_char,
                     self.current_char,
-                    self.line_number,
                     self.position,
                 });
-                std.debug.print("Input: {s}\n", .{self.input.items[self.line_number]});
                 unreachable; // Handle unexpected characters
             },
         }
@@ -204,74 +206,47 @@ pub const Lexer = struct {
         try self.tokens.append(token);
     }
 
-    pub fn get_actual_line(self: *Lexer) usize {
-        return if (self.start_position >= self.position)
-            self.line_number - 1
-        else
-            self.line_number;
-    }
-
     pub fn get_value(self: *Lexer) []const u8 {
-        const line_number = self.get_actual_line();
+        const end_index = self.position;
 
-        const end_index = if (self.start_position >= self.position) self.input.items[line_number].len else self.position;
-
-        return self.input.items[line_number][self.start_position..end_index];
+        return self.input[self.start_position..end_index];
     }
 
     pub fn add_token(self: *Lexer, token_type: TokenType) !void {
-        const line_number = self.get_actual_line();
         const value = self.get_value();
 
-        const token = Token.init(token_type, value, line_number);
+        const token = Token.init(token_type, value);
 
         try self.tokens.append(token);
     }
 
     pub fn at_end(self: *Lexer) bool {
-        if (self.line_number >= self.input.items.len) return true;
-
-        return self.line_number + 1 >= self.input.items.len and self.position >= self.input.items[self.line_number].len;
+        return self.position >= self.input.len;
     }
 
     pub fn peek(self: *Lexer) u8 {
         if (self.at_end()) return 0;
 
-        if (self.position >= self.input.items[self.line_number].len) {
-            return 0; // No next character
+        if (self.position >= self.input.len) {
+            return 0;
         }
 
-        return self.input.items[self.line_number][self.position];
+        return self.input[self.position];
     }
 
     pub fn peek_next(self: *Lexer) u8 {
         if (self.at_end()) return 0;
 
-        if (self.position + 1 >= self.input.items[self.line_number].len) {
+        if (self.position + 1 >= self.input.len) {
             return 0; // No next character
         }
 
-        return self.input.items[self.line_number][self.position + 1];
+        return self.input[self.position + 1];
     }
 
     pub fn advance(self: *Lexer) void {
-        const overflow = self.position >= self.input.items[self.line_number].len;
-
-        if (overflow) {
-            self.line_number += 1;
-            self.start_position = 0;
-            self.position = 0;
-        }
-
-        if (self.line_number >= self.input.items.len) {
-            self.current_char = 0; // End of input
-            return;
-        }
-        self.current_char = self.input.items[self.line_number][self.position];
-
-        if (!overflow) {
-            self.next_position();
-        }
+        self.current_char = self.input[self.position];
+        self.position += 1;
     }
 
     pub fn match(self: *Lexer, expected: u8) bool {
