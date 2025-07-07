@@ -1,0 +1,4 @@
+fun square(x) {
+  throwaway x * x.
+}.
+scream(square(8)).

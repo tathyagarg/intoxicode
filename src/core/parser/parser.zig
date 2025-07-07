@@ -235,11 +235,10 @@ pub const Parser = struct {
     }
 
     fn function_declaration(self: *Parser) !*Statement {
-        const name = self.previous().value;
+        const name = (try self.consume(.Identifier, "Expected function name after 'fun' keyword.")).value;
         _ = try self.consume(.LeftParen, "Expected '(' after function name.");
 
         var params = std.ArrayList([]const u8).init(self.allocator);
-        defer params.deinit();
 
         while (!self.is_at_end() and !self.check(.RightParen)) {
             if (self.match(&[_]TokenType{.Identifier})) {
@@ -293,7 +292,6 @@ pub const Parser = struct {
 
     fn throwaway_statement(self: *Parser) !*Statement {
         const expr = try self.expression();
-        _ = try self.consume(.LeftParen, "Expected '(' after 'throwaway'.");
 
         const stmt = try self.allocator.create(Statement);
         stmt.* = Statement{

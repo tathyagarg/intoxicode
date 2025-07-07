@@ -65,6 +65,8 @@ pub const Statement = union(enum) {
                 return try builder.toOwnedSlice();
             },
             .if_statement => self.if_statement.pretty_print(allocator),
+            .function_declaration => self.function_declaration.pretty_print(allocator),
+            .throwaway_statement => self.throwaway_statement.pretty_print(allocator),
             else => unreachable,
         };
     }
@@ -143,6 +145,36 @@ pub const FunctionDeclaration = struct {
         for (self.body.items) |s| s.deinit();
         self.body.deinit();
     }
+
+    pub fn pretty_print(self: FunctionDeclaration, allocator: std.mem.Allocator) anyerror![]const u8 {
+        var builder = std.ArrayList(u8).init(allocator);
+        defer builder.deinit();
+
+        try builder.appendSlice("function ");
+        try builder.appendSlice(self.name);
+        try builder.appendSlice("(");
+
+        for (self.parameters.items, 0..) |param, i| {
+            if (i > 0) {
+                try builder.appendSlice(", ");
+            }
+            try builder.appendSlice(param);
+        }
+
+        try builder.appendSlice(") {\n");
+
+        for (self.body.items) |s| {
+            try builder.appendSlice("    ");
+            try builder.appendSlice(try s.pretty_print(allocator));
+            try builder.appendSlice("\n");
+        }
+
+        try builder.appendSlice("}\n");
+
+        const result = try builder.toOwnedSlice();
+
+        return result;
+    }
 };
 
 pub const TryStatement = struct {
@@ -165,5 +197,16 @@ pub const ThrowawayStatement = struct {
 
     pub fn deinit(self: ThrowawayStatement) void {
         self.expression.deinit();
+    }
+
+    pub fn pretty_print(self: ThrowawayStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
+        var builder = std.ArrayList(u8).init(allocator);
+        defer builder.deinit();
+
+        try builder.appendSlice("throwaway: ");
+        try builder.appendSlice(try self.expression.pretty_print(allocator));
+        try builder.appendSlice(";");
+
+        return try builder.toOwnedSlice();
     }
 };

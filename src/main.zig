@@ -14,7 +14,7 @@ pub fn main() !void {
     var stdout = std.io.getStdOut().writer();
     var stderr = std.io.getStdErr().writer();
 
-    const data = try loader.load_file(allocator, "examples/04_array.??");
+    const data = try loader.load_file(allocator, "examples/05_functions.??");
     var lexer = Lexer.init(data, allocator);
 
     try lexer.scan_tokens();
@@ -26,7 +26,8 @@ pub fn main() !void {
 
     const runner = try Runner.init(allocator, stdout.any(), stderr.any());
 
-    try runner.run(
+    _ = try runner.run(
         statements.items,
+        runner.variables,
     );
 }

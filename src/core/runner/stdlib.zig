@@ -87,3 +87,41 @@ pub fn pow(_: Runner, args: []Expression) anyerror!Expression {
         },
     };
 }
+
+pub fn sqrt(_: Runner, args: []Expression) anyerror!Expression {
+    if (args.len != 1) {
+        return error.InvalidArgumentCount;
+    }
+
+    const value = args[0].literal.number;
+    if (value < 0) {
+        return error.NegativeSqrt;
+    }
+
+    return Expression{
+        .literal = Literal{
+            .number = std.math.sqrt(value),
+        },
+    };
+}
+
+pub fn length(_: Runner, args: []Expression) anyerror!Expression {
+    if (args.len != 1) {
+        return error.InvalidArgumentCount;
+    }
+
+    const arg = args[0];
+    return switch (arg.literal) {
+        .string => |str| Expression{
+            .literal = Literal{
+                .number = @floatFromInt(str.len),
+            },
+        },
+        .array => |array| Expression{
+            .literal = Literal{
+                .number = @floatFromInt(array.items.len),
+            },
+        },
+        else => error.InvalidArgumentType,
+    };
+}
