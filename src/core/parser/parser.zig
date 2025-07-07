@@ -276,14 +276,34 @@ pub const Parser = struct {
     }
 
     fn try_statement(self: *Parser) !*Statement {
-        const expr = try self.expression();
-        _ = try self.consume(.LeftParen, "Expected '(' after 'try'.");
+        _ = try self.consume(.LeftBrace, "Expected '{' after 'try'.");
+
+        var body = std.ArrayList(*Statement).init(self.allocator);
+
+        while (!self.is_at_end() and !self.check(.RightBrace)) {
+            const stmt = try self.statement();
+            try body.append(stmt);
+        }
+
+        _ = try self.consume(.RightBrace, "Expected '}' to end 'try' block.");
+
+        var catch_block = std.ArrayList(*Statement).init(self.allocator);
+
+        _ = try self.consume(.Gotcha, "Expected 'gotcha' after 'try' block.");
+        _ = try self.consume(.LeftBrace, "Expected '{' after 'gotcha'.");
+
+        while (!self.is_at_end() and !self.check(.RightBrace)) {
+            const stmt = try self.statement();
+            try catch_block.append(stmt);
+        }
+
+        _ = try self.consume(.RightBrace, "Expected '}' to end 'gotcha' block.");
 
         const stmt = try self.allocator.create(Statement);
         stmt.* = Statement{
             .try_statement = statements.TryStatement{
-                .expression = expr,
-                .catch_block = null,
+                .body = body,
+                .catch_block = catch_block,
             },
         };
 

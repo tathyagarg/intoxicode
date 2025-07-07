@@ -178,15 +178,15 @@ pub const FunctionDeclaration = struct {
 };
 
 pub const TryStatement = struct {
-    expression: Expression,
-    catch_block: ?std.ArrayList(Statement),
+    body: std.ArrayList(*Statement),
+    catch_block: std.ArrayList(*Statement),
 
     certainty: f32 = 1.0,
 
     pub fn deinit(self: TryStatement) void {
         self.expression.deinit();
-        for (self.catch_block.?.items) |s| s.deinit();
-        self.catch_block.?.deinit();
+        for (self.catch_block.items) |s| s.deinit();
+        self.catch_block.deinit();
     }
 };
 

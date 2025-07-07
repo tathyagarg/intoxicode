@@ -1,0 +1,5 @@
+try {
+  scream(x + 1).
+} gotcha {
+    scream("No").
+}.

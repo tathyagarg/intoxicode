@@ -92,6 +92,17 @@ pub const Runner = struct {
                         .throwaway_statement => |throwaway| {
                             return try self.evaluate_expression(throwaway.expression, variables);
                         },
+                        .try_statement => |try_stmt| {
+                            if (self.run(try_stmt.body.items, variables) catch {
+                                if (try self.run(try_stmt.catch_block.items, variables)) |catch_result| {
+                                    return catch_result;
+                                }
+
+                                return null;
+                            }) |result| {
+                                return result;
+                            }
+                        },
                         else => {},
                     }
                 }
