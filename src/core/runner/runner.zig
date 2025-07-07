@@ -47,25 +47,30 @@ pub const Runner = struct {
 
     pub fn run(self: Runner, statements: []*Statement) !void {
         for (statements) |statement| {
-            switch (statement.*) {
-                .assignment => |assignment| {
-                    const key = assignment.identifier;
-                    const value = try self.evaluate_expression(assignment.expression);
+            const certainty = try statement.get_certainty();
+            const roll = std.crypto.random.float(f32);
 
-                    try self.variables.put(key, value);
-                },
-                .expression => |expr| {
-                    _ = try self.evaluate_expression(expr);
-                },
-                .if_statement => |if_stmt| {
-                    const condition = try self.evaluate_expression(if_stmt.condition);
-                    if (condition.literal.boolean) {
-                        try self.run(if_stmt.then_branch.items);
-                    } else if (if_stmt.else_branch) |else_branch| {
-                        try self.run(else_branch.items);
-                    }
-                },
-                else => {},
+            if (roll <= certainty) {
+                switch (statement.*) {
+                    .assignment => |assignment| {
+                        const key = assignment.identifier;
+                        const value = try self.evaluate_expression(assignment.expression);
+
+                        try self.variables.put(key, value);
+                    },
+                    .expression => |expr| {
+                        _ = try self.evaluate_expression(expr);
+                    },
+                    .if_statement => |if_stmt| {
+                        const condition = try self.evaluate_expression(if_stmt.condition);
+                        if (condition.literal.boolean) {
+                            try self.run(if_stmt.then_branch.items);
+                        } else if (if_stmt.else_branch) |else_branch| {
+                            try self.run(else_branch.items);
+                        }
+                    },
+                    else => {},
+                }
             }
         }
     }

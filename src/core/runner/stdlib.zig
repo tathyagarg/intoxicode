@@ -40,7 +40,7 @@ pub fn min(_: Runner, args: []Expression) anyerror!Expression {
         return error.InvalidArgumentCount;
     }
 
-    var min_value: ?f64 = null;
+    var min_value: ?f32 = null;
     for (args) |arg| {
         if (min_value == null or arg.literal.number < min_value.?) {
             min_value = arg.literal.number;
@@ -59,7 +59,7 @@ pub fn max(_: Runner, args: []Expression) anyerror!Expression {
         return error.InvalidArgumentCount;
     }
 
-    var max_value: ?f64 = null;
+    var max_value: ?f32 = null;
     for (args) |arg| {
         if (max_value == null or arg.literal.number > max_value.?) {
             max_value = arg.literal.number;

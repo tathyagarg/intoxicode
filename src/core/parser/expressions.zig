@@ -116,26 +116,50 @@ pub const Expression = union(enum) {
             .identifier => {},
         }
     }
+
+    pub fn get_certainty(self: Expression) f32 {
+        return switch (self) {
+            .binary => self.binary.certainty,
+            .grouping => self.grouping.certainty,
+            .literal => 1.0, // literals are always certain
+            .identifier => self.identifier.certainty,
+            .call => self.call.certainty,
+        };
+    }
+
+    pub fn set_certainty(self: *Expression, certainty: f32) void {
+        switch (self.*) {
+            .binary => |*b| b.certainty = certainty,
+            .grouping => |*g| g.certainty = certainty,
+            .literal => {},
+            .identifier => |*id| id.certainty = certainty,
+            .call => |*c| c.certainty = certainty,
+        }
+    }
 };
 
 pub const Binary = struct {
     left: *const Expression,
     operator: Token,
     right: *const Expression,
+
+    certainty: f32 = 1.0,
 };
 
 pub const Grouping = struct {
     expression: *const Expression,
+
+    certainty: f32 = 1.0,
 };
 
 pub const Literal = union(enum) {
-    number: f64,
+    number: f32,
     string: []const u8,
     boolean: bool,
     null: ?void,
 
     pub fn number_from_string(s: []const u8) !Literal {
-        const number = try std.fmt.parseFloat(f64, s);
+        const number = try std.fmt.parseFloat(f32, s);
         return Literal{ .number = number };
     }
 
@@ -177,6 +201,8 @@ pub const Literal = union(enum) {
 pub const Identifier = struct {
     name: []const u8,
 
+    certainty: f32 = 1.0,
+
     pub fn pretty_print(self: Identifier, allocator: std.mem.Allocator) ![]const u8 {
         const message = try std.fmt.allocPrint(allocator, "{s}", .{self.name});
 
@@ -187,6 +213,8 @@ pub const Identifier = struct {
 pub const Call = struct {
     callee: *const Expression,
     arguments: ?std.ArrayList(Expression),
+
+    certainty: f32 = 1.0,
 
     pub fn deinit(self: Call) void {
         for (self.arguments.items) |arg| arg.deinit();

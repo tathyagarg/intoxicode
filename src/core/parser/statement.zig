@@ -26,7 +26,7 @@ pub const Statement = union(enum) {
 
     pub fn get_certainty(self: Statement) !f32 {
         return switch (self) {
-            .expression => std.debug.panic("Cannot get certainty of an expression statement", .{}),
+            .expression => self.expression.get_certainty(),
             .assignment => self.assignment.certainty,
             .if_statement => self.if_statement.certainty,
             .loop_statement => self.loop_statement.certainty,
@@ -36,9 +36,9 @@ pub const Statement = union(enum) {
         };
     }
 
-    pub fn set_certainty(self: *Statement, certainty: f32) !void {
+    pub fn set_certainty(self: *Statement, certainty: f32) void {
         switch (self.*) {
-            .expression => std.debug.panic("Cannot set certainty of an expression statement", .{}),
+            .expression => |*e| e.set_certainty(certainty),
             .assignment => |*a| a.certainty = certainty,
             .if_statement => |*i| i.certainty = certainty,
             .loop_statement => |*l| l.certainty = certainty,

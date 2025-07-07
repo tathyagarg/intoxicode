@@ -14,7 +14,7 @@ pub fn main() !void {
     var stdout = std.io.getStdOut().writer();
     var stderr = std.io.getStdErr().writer();
 
-    const data = try loader.load_file(allocator, "examples/02_branch.??");
+    const data = try loader.load_file(allocator, "examples/03_maybe.??");
     var lexer = Lexer.init(data, allocator);
 
     try lexer.scan_tokens();

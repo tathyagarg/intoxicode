@@ -102,10 +102,8 @@ pub const Parser = struct {
             else => std.debug.panic("Unexpected token after statement: {s}", .{next.value}),
         };
 
-        switch (found_stmt.*) {
-            .expression => {},
-            else => |*v| try v.set_certainty(certainty),
-        }
+        found_stmt.set_certainty(certainty);
+
         return found_stmt;
     }
 
