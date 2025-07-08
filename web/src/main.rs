@@ -42,6 +42,7 @@ fn main() {
 
 #[cfg(feature = "server")]
 async fn launch_server(component: fn() -> Element) {
+    use axum::routing::get_service;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     // Get the address the server should run on. If the CLI is running, the CLI proxies fullstack into the main address
@@ -52,11 +53,8 @@ async fn launch_server(component: fn() -> Element) {
     let address = SocketAddr::new(ip, port);
     let listener = tokio::net::TcpListener::bind(address).await.unwrap();
 
-    let assets_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("asstes/docs");
-
     let router = axum::Router::new()
-        // serve_dioxus_application adds routes to server side render the application, serve static assets, and register server functions
-        .fallback_service(ServeDir::new(assets_dir).append_index_html_on_directories(true))
+        .nest_service("/posts", get_service(ServeDir::new("posts")))
         .serve_dioxus_application(ServeConfig::new().unwrap(), App)
         .into_make_service();
     axum::serve(listener, router).await.unwrap();
