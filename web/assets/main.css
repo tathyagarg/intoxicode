@@ -1,0 +1,8 @@
+body {
+  background-color: var(--ctp-base);
+  color: var(--ctp-text);
+}
+
+a {
+  color: var(--ctp-green);
+}
