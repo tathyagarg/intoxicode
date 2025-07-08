@@ -1,0 +1,16 @@
+{
+  "pages": [
+    {
+      "path": "doc_1",
+      "title": "Introduction to the Project"
+    },
+    {
+      "path": "doc_2",
+      "title": "Getting Started with the Project"
+    },
+    {
+      "path": "doc_3",
+      "title": "Advanced Features and Customization"
+    }
+  ]
+}
