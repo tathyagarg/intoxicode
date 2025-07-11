@@ -21,11 +21,18 @@
           window.location.href = `/docs/${data.next.location}`;
         }
       }
+
+      if (window.Prism) window.Prism.highlightAll();
     });
   });
 
   marked.use(gfmHeadingId({ prefix: "heading-" }));
 </script>
+
+<svelte:head>
+  <link rel="stylesheet" href="/prism/macchiato.css" />
+  <script src="/prism/prism.js" defer></script>
+</svelte:head>
 
 <div class="flex flex-row min-h-screen bg-mantle">
   <div class="flex flex-col gap-4 flex-1">

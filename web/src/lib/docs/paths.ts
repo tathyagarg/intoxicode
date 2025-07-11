@@ -12,7 +12,12 @@ const paths: Record<string, Path> = {
   'installation': {
     name: 'Installation',
     prev: 'home',
-  }
+    next: 'statements'
+  },
+  'statements': {
+    name: 'Statements',
+    prev: 'installation',
+  },
 }
 
 export default paths;
