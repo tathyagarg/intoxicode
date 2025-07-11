@@ -63,16 +63,18 @@
     </div>
   </div>
   <div class="bg-base w-1/3 min-h-full">
-    {#each getHeadingList() as heading}
-      <div class="p-4">
-        <a
-          href={`#${heading.id}`}
-          class="text-lg font-semibold"
-          style={`margin-left: ${heading.level * 20}px;`}
-        >
-          {heading.text}
-        </a>
-      </div>
-    {/each}
+    <div class="sticky top-0">
+      {#each getHeadingList() as heading}
+        <div class="p-2">
+          <a
+            href={`#${heading.id}`}
+            class="text-lg font-semibold"
+            style={`margin-left: ${heading.level * 20}px;`}
+          >
+            {heading.text}
+          </a>
+        </div>
+      {/each}
+    </div>
   </div>
 </div>

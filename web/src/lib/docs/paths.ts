@@ -1,6 +1,5 @@
 type Path = {
   name: string;
-  icon: string;
   prev?: string;
   next?: string;
 };
@@ -8,12 +7,10 @@ type Path = {
 const paths: Record<string, Path> = {
   'home': {
     name: 'Home',
-    icon: 'home',
-    next: 'first'
+    next: 'installation'
   },
-  'first': {
-    name: 'First',
-    icon: 'first',
+  'installation': {
+    name: 'Installation',
     prev: 'home',
   }
 }

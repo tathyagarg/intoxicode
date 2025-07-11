@@ -4,8 +4,12 @@
   let { children } = $props();
 </script>
 
-<div class="min-h-screen min-w-screen max-w-screen bg-base text-text">
-  {@render children()}
+<div
+  class="min-h-screen min-w-screen max-w-screen bg-base text-text flex flex-col"
+>
+  <div class="flex-1">
+    {@render children()}
+  </div>
   <div
     class="text-sm text-subtext0 p-4 bg-crust flex justify-center gap-8 items-center"
   >

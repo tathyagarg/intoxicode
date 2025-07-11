@@ -35,7 +35,20 @@ pub fn main() !void {
     try cli_parser.add_argument(&input_file);
     try cli_parser.add_argument(&content);
 
-    try cli_parser.parse(std.os.argv);
+    const target = @import("builtin").target;
+
+    if (target.os.tag == .windows) {
+        const raw_args = try std.process.argsAlloc(allocator);
+        var args = try allocator.alloc([*:0]u8, raw_args.len);
+
+        for (raw_args, 0..) |arg, i| {
+            args[i] = arg;
+        }
+
+        try cli_parser.parse(args);
+    } else {
+        try cli_parser.parse(std.os.argv);
+    }
 
     const data = if (cli_parser.arguments.get("file").?.value == null)
         cli_parser.arguments.get("content").?.value.?
