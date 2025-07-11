@@ -1,14 +1,15 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  mode: "all",
-  content: ["./src/**/*.{rs,html,css}", "./dist/**/*.html"],
   theme: {
-    extend: {},
-  },
-  plugins: [
-    require("@catppuccin/tailwindcss")({
-      defaultFlavour: "macchiato",
-      prefix: "ctp",
-    }),
-  ],
-};
+    extend: {
+      typography: () => ({
+        awesome: {
+          css: {
+            '--tw-prose-body': 'var(--color-text)',
+            '--tw-prose-headings': 'var(--color-blue)',
+          }
+        }
+      })
+    }
+  }
+}
