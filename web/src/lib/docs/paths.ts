@@ -17,6 +17,16 @@ const paths: Record<string, Path> = {
   'statements': {
     name: 'Statements',
     prev: 'installation',
+    next: 'variables'
+  },
+  'variables': {
+    name: 'Variables',
+    prev: 'statements',
+    next: 'operators'
+  },
+  'operators': {
+    name: 'Operators',
+    prev: 'variables',
   },
 }
 
