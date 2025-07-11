@@ -28,6 +28,7 @@
 	"dependencies": {
 		"@tailwindcss/postcss": "^4.1.11",
 		"autoprefixer": "^10.4.21",
-		"marked": "^16.0.0"
+		"marked": "^16.0.0",
+		"marked-gfm-heading-id": "^4.1.2"
 	}
 }

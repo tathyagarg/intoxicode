@@ -7,6 +7,8 @@ module.exports = {
           css: {
             '--tw-prose-body': 'var(--color-text)',
             '--tw-prose-headings': 'var(--color-blue)',
+            '--tw-prose-links': 'var(--color-green)',
+            '--tw-prose-bold': 'var(--color-sky)',
           }
         }
       })
