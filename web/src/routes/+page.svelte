@@ -28,10 +28,12 @@
 </svlte:head>
 
 <div
-  class="w-screen h-screen fixed top-0 left-0 pointer-events-none"
+  class="w-screen h-screen fixed top-0 left-0 pointer-events-none z-1"
   id="beer"
 ></div>
-<div class="w-screen h-screen flex flex-col items-center justify-center">
+<div
+  class="w-screen h-screen flex flex-col items-center justify-center relative z-2"
+>
   <h1 class="text-8xl font-bold">Intoxicode</h1>
   <p class="text-2xl mt-4">An esolang to run code in a drunken state</p>
   <div class="grid grid-cols-3 w-2/5 h-20 mt-4">
