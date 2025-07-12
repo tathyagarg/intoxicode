@@ -42,7 +42,7 @@ const paths: Record<string, Path> = {
   'exception-handling': {
     name: 'Exception Handling',
     prev: 'functions',
-    next: 'builtin-functions'
+    next: 'built-in-functions'
   },
   'built-in-functions': {
     name: 'Built-in Functions',

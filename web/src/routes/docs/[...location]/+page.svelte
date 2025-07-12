@@ -36,7 +36,7 @@
 
 <div class="flex flex-row min-h-screen bg-mantle">
   <div class="flex flex-col gap-4 flex-1">
-    <div class="p-4 prose prose-awesome font-sans min-w-2/3 flex-1">
+    <div class="p-4 prose prose-awesome font-sans min-w-full flex-1">
       {@html marked(data.content)}
     </div>
     <div

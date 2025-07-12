@@ -23,7 +23,7 @@
       </ul>
     </div>
   </div>
-  <div class="flex-[4]">
+  <div class="flex-[4] shadow-2xl">
     {@render children()}
   </div>
 </div>

@@ -5,6 +5,13 @@
 </script>
 
 <div
+  class="bg-crust text-subtext0 p-4 flex items-center gap-8 *:hover:text-text"
+>
+  <a href="/">Home</a>
+  <a href="/docs">Docs</a>
+  <a href="/ide">IDE</a>
+</div>
+<div
   class="min-h-screen min-w-screen max-w-screen bg-base text-text flex flex-col"
 >
   <div class="flex-1">

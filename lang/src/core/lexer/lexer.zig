@@ -111,6 +111,7 @@ pub const Lexer = struct {
             '.' => try self.add_token(TokenType.Period),
             '?' => try self.add_token(TokenType.QuestionMark),
             ',' => try self.add_token(TokenType.Comma),
+            '#' => while (!self.at_end() and self.current_char != '\n') self.advance(),
             '=' => {
                 if (self.peek() == '=') {
                     self.advance(); // Consume the '='
