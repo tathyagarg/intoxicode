@@ -1,7 +1,36 @@
+<script lang="ts">
+  import { onMount } from "svelte";
+
+  onMount(() => {
+    const beer = document.getElementById("beer");
+    setInterval(() => {
+      const beerElement = document.createElement("img");
+      beerElement.src = "/assets/beer.png";
+      beerElement.className = "absolute w-16 h-16 beer";
+
+      const rotation = Math.random() * 360;
+
+      beerElement.style.left = `${Math.random() * 100}vw`;
+
+      beer?.appendChild(beerElement);
+      beerElement.style.setProperty("--rot", `${rotation + 180}deg`);
+      beerElement.style.setProperty("--rot-start", `${rotation}deg`);
+
+      setTimeout(() => {
+        beerElement.remove();
+      }, 10000);
+    }, 500);
+  });
+</script>
+
 <svlte:head>
   <title>Home Page</title>
 </svlte:head>
 
+<div
+  class="w-screen h-screen fixed top-0 left-0 pointer-events-none"
+  id="beer"
+></div>
 <div class="w-screen h-screen flex flex-col items-center justify-center">
   <h1 class="text-8xl font-bold">Intoxicode</h1>
   <p class="text-2xl mt-4">An esolang to run code in a drunken state</p>
@@ -30,3 +59,20 @@
     </a>
   </div>
 </div>
+
+<style>
+  @keyframes beer-float {
+    0% {
+      top: -10%;
+      transform: rotate(var(--rot-start));
+    }
+    100% {
+      top: 110%;
+      transform: rotate(var(--rot));
+    }
+  }
+
+  :global(.beer) {
+    animation: beer-float 10s linear forwards;
+  }
+</style>

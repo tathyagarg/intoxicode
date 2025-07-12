@@ -108,6 +108,10 @@
   }
 </script>
 
+<svelte:head>
+  <title>IDE</title>
+</svelte:head>
+
 <div class="flex flex-col w-full h-screen">
   <div class="flex p-4 w-full h-full gap-4 flex-row">
     <div
