@@ -27,6 +27,21 @@ const paths: Record<string, Path> = {
   'operators': {
     name: 'Operators',
     prev: 'variables',
+    next: 'flow-control'
+  },
+  'flow-control': {
+    name: 'Flow Control',
+    prev: 'operators',
+    next: 'functions'
+  },
+  'functions': {
+    name: 'Functions',
+    prev: 'flow-control',
+    next: 'exception-handling'
+  },
+  'exception-handling': {
+    name: 'Exception Handling',
+    prev: 'functions',
   },
 }
 

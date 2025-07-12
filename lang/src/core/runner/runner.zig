@@ -83,11 +83,11 @@ pub const Runner = struct {
                         .function_declaration => |func_decl| {
                             const key = func_decl.name;
 
-                            if (self.functions.get(key) == null) {
-                                try self.functions.put(key, statement.*);
-                            } else {
-                                return error.FunctionAlreadyExists;
-                            }
+                            // if (self.functions.get(key) == null) {
+                            try self.functions.put(key, statement.*);
+                            // } else {
+                            //     return error.FunctionAlreadyExists;
+                            // }
                         },
                         .throwaway_statement => |throwaway| {
                             return try self.evaluate_expression(throwaway.expression, variables);
