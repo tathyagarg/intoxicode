@@ -11,13 +11,16 @@
       <hr />
       <ul class="mt-2">
         {#each Object.entries(paths) as [key, path]}
-          <li class="border-l-2 border-surface2 pl-4 hover:border-text">
-            <a
+          <li
+            class="border-l-2 border-surface2 pl-4 hover:border-text"
+            style="margin-left: calc(.75rem * {path.level})"
+          >
+            <button
               class="block text-subtext1 text-lg hover:text-text"
-              href={`/docs/${key}`}
+              onclick={() => (window.location.href = `/docs/${key}`)}
             >
               {path.name}
-            </a>
+            </button>
           </li>
         {/each}
       </ul>

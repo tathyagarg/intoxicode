@@ -9,7 +9,7 @@
 >
   <a href="/">Home</a>
   <a href="/docs">Docs</a>
-  <a href="/ide">IDE</a>
+  <button onclick={() => (window.location.href = "/ide")}>IDE</button>
 </div>
 <div
   class="min-h-screen min-w-screen max-w-screen bg-base text-text flex flex-col"

@@ -4,6 +4,7 @@ const Statement = @import("../parser/parser.zig").statements.Statement;
 const Expression = @import("../parser/parser.zig").expressions.Expression;
 const Literal = @import("../parser/parser.zig").expressions.Literal;
 const Identifier = @import("../parser/parser.zig").expressions.Identifier;
+const Call = @import("../parser/parser.zig").expressions.Call;
 
 const StdFunction = *const fn (Runner, []Expression) anyerror!Expression;
 
@@ -111,9 +112,25 @@ pub const Runner = struct {
         return null;
     }
 
-    pub fn evaluate_expression(self: Runner, expr: Expression, variables: *std.StringHashMap(Expression)) anyerror!Expression {
+    pub fn evaluate_expression(
+        self: Runner,
+        expr: Expression,
+        variables: *std.StringHashMap(Expression),
+    ) anyerror!Expression {
         return switch (expr) {
-            .literal => expr,
+            .literal => switch (expr.literal) {
+                .array => |array| {
+                    for (array.items, 0..) |item, index| {
+                        array.items[index] = try self.evaluate_expression(item, variables);
+                    }
+                    return Expression{
+                        .literal = Literal{
+                            .array = array,
+                        },
+                    };
+                },
+                else => return expr,
+            },
             .indexing => |indexing| {
                 const array_expr = try self.evaluate_expression(indexing.array.*, variables);
                 const index_expr = try self.evaluate_expression(indexing.index.*, variables);
@@ -123,7 +140,7 @@ pub const Runner = struct {
 
                 if (index < array.items.len) {
                     return Expression{
-                        .literal = (try self.evaluate_expression(array.items[index], variables)).literal,
+                        .literal = array.items[index].literal,
                     };
                 } else {
                     return error.IndexOutOfBounds;
@@ -176,12 +193,12 @@ pub const Runner = struct {
                     },
                     .Equal => Expression{
                         .literal = Literal{
-                            .boolean = left.literal.number == right.literal.number,
+                            .boolean = try left.equals(right, self),
                         },
                     },
                     .NotEqual => Expression{
                         .literal = Literal{
-                            .boolean = left.literal.number != right.literal.number,
+                            .boolean = !try left.equals(right, self),
                         },
                     },
                     .GreaterThan => Expression{
@@ -211,37 +228,45 @@ pub const Runner = struct {
                 return try self.evaluate_expression(group.expression.*, variables);
             },
             .call => |call| {
-                const callee = try self.evaluate_expression(call.callee.*, variables);
-                switch (callee) {
-                    .literal => {
-                        return Expression{
-                            .literal = Literal{
-                                .null = null,
-                            },
-                        };
-                    },
-                    .identifier => |id| {
-                        var arguments: std.ArrayList(Expression) = std.ArrayList(Expression).init(self.allocator);
-
-                        if (call.arguments != null) {
-                            for (call.arguments.?.items) |arg| {
-                                const evaluated = try self.evaluate_expression(arg, variables);
-                                try arguments.append(evaluated);
-                            }
-                        }
-
-                        if (self.std_functions.get(id.name)) |func| {
-                            return try func(self, arguments.items);
-                        } else if (self.functions.get(id.name)) |func_stmt| {
-                            return try self.run_function(func_stmt, arguments.items);
-                        } else {
-                            return error.FunctionNotFound;
-                        }
-                    },
-                    else => return error.InvalidFunctionCall,
-                }
+                return try self.call_function(call, variables);
             },
         };
+    }
+
+    fn call_function(
+        self: Runner,
+        call: Call,
+        variables: *std.StringHashMap(Expression),
+    ) !Expression {
+        const callee = try self.evaluate_expression(call.callee.*, variables);
+        switch (callee) {
+            .literal => {
+                return Expression{
+                    .literal = Literal{
+                        .null = null,
+                    },
+                };
+            },
+            .identifier => |id| {
+                var arguments: std.ArrayList(Expression) = std.ArrayList(Expression).init(self.allocator);
+
+                if (call.arguments != null) {
+                    for (call.arguments.?.items) |arg| {
+                        const evaluated = try self.evaluate_expression(arg, variables);
+                        try arguments.append(evaluated);
+                    }
+                }
+
+                if (self.std_functions.get(id.name)) |func| {
+                    return try func(self, arguments.items);
+                } else if (self.functions.get(id.name)) |func_stmt| {
+                    return try self.run_function(func_stmt, arguments.items);
+                } else {
+                    return error.FunctionNotFound;
+                }
+            },
+            else => return error.InvalidFunctionCall,
+        }
     }
 
     fn run_function(self: Runner, func: Statement, args: []Expression) anyerror!Expression {

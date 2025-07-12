@@ -10,19 +10,19 @@ pub const Expression = union(enum) {
     call: Call,
     indexing: Indexing,
 
-    pub fn equals(self: Expression, other: Expression) bool {
+    pub fn equals(self: Expression, other: Expression, runner: Runner) !bool {
         return switch (other) {
             .binary => |b| switch (self) {
                 .binary => |self_b| {
                     if (!self_b.operator.equals(b.operator)) return false;
-                    if (!self_b.left.equals(b.left.*)) return false;
-                    if (!self_b.right.equals(b.right.*)) return false;
+                    if (!try self_b.left.equals(b.left.*, runner)) return false;
+                    if (!try self_b.right.equals(b.right.*, runner)) return false;
                     return true;
                 },
                 else => false,
             },
             .grouping => |g| switch (self) {
-                .grouping => |self_g| self_g.expression.equals(g.expression.*),
+                .grouping => |self_g| self_g.expression.equals(g.expression.*, runner),
                 else => false,
             },
             .literal => |l| switch (self) {
@@ -35,7 +35,7 @@ pub const Expression = union(enum) {
                         .array => |arr| {
                             if (l.array.items.len != arr.items.len) return false;
                             for (l.array.items, arr.items) |item, other_item| {
-                                if (!item.equals(other_item)) return false;
+                                if (!try item.equals(other_item, runner)) return false;
                             }
                             return true;
                         },
@@ -47,15 +47,30 @@ pub const Expression = union(enum) {
                 .identifier => |self_id| std.mem.eql(u8, id.name, self_id.name),
                 else => false,
             },
-            .call => |c| switch (self) {
-                .call => |self_c| {
-                    if (!self_c.callee.equals(c.callee.*)) return false;
-                    if (self_c.arguments.?.items.len != c.arguments.?.items.len) return false;
+            .call => |c| {
+                const this_value = try runner.evaluate_expression(self, runner.variables);
+                const other_value = try runner.evaluate_expression(c.callee.*, runner.variables);
 
-                    for (self_c.arguments.?.items, c.arguments.?.items) |arg, other_arg| {
-                        if (!arg.equals(other_arg)) return false;
-                    }
-                    return true;
+                return try this_value.equals(other_value, runner);
+            },
+            .indexing => |i| switch (self) {
+                .indexing => |self_i| {
+                    const left_array = try runner.evaluate_expression(self_i.array.*, runner.variables);
+                    const left_index = try runner.evaluate_expression(self_i.index.*, runner.variables);
+
+                    const right_index = try runner.evaluate_expression(self_i.index.*, runner.variables);
+                    const right_array = try runner.evaluate_expression(i.array.*, runner.variables);
+
+                    const left_element = try runner.evaluate_expression(
+                        left_array.literal.array.items[@intFromFloat(left_index.literal.number)],
+                        runner.variables,
+                    );
+                    const right_element = try runner.evaluate_expression(
+                        right_array.literal.array.items[@intFromFloat(right_index.literal.number)],
+                        runner.variables,
+                    );
+
+                    return try left_element.equals(right_element, runner);
                 },
                 else => false,
             },

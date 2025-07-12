@@ -1,5 +1,6 @@
 type Path = {
   name: string;
+  level?: number;
   prev?: string;
   next?: string;
 };
@@ -22,6 +23,12 @@ const paths: Record<string, Path> = {
   'variables': {
     name: 'Variables',
     prev: 'statements',
+    next: 'arrays'
+  },
+  'arrays': {
+    name: 'Arrays',
+    level: 2,
+    prev: 'variables',
     next: 'operators'
   },
   'operators': {

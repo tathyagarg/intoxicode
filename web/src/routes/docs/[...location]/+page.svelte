@@ -1,6 +1,8 @@
 <script lang="ts">
   import { marked } from "marked";
   import { getHeadingList, gfmHeadingId } from "marked-gfm-heading-id";
+  import type { HeadingData } from "marked-gfm-heading-id";
+  import { onMount, tick } from "svelte";
 
   let { data } = $props();
 
@@ -21,12 +23,20 @@
           window.location.href = `/docs/${data.next.location}`;
         }
       }
-
-      if (window.Prism) window.Prism.highlightAll();
     });
   });
 
-  marked.use(gfmHeadingId({ prefix: "heading-" }));
+  let content = $state("");
+  let headings: HeadingData[] = $state([]);
+
+  onMount(async () => {
+    marked.use(gfmHeadingId({ prefix: "heading-" }));
+    content = await marked(data.content);
+    headings = getHeadingList();
+
+    await tick();
+    window.Prism.highlightAll();
+  });
 </script>
 
 <svelte:head>
@@ -37,33 +47,35 @@
 <div class="flex flex-row min-h-screen bg-mantle">
   <div class="flex flex-col gap-4 flex-1">
     <div class="p-4 prose prose-awesome font-sans min-w-full flex-1">
-      {@html marked(data.content)}
+      {@html content}
     </div>
     <div
       class="w-full h-30 grid grid-cols-2 grid-rows-1 p-2 gap-2 *:rounded-lg *:text-center *:leading-26"
     >
       {#if data.prev?.name}
-        <a
-          href={`/docs/${data.prev?.location}`}
-          class="underline text-base font-bold"
+        <button
+          onclick={() =>
+            (window.location.href = `/docs/${data.prev?.location}`)}
+          class="underline text-base font-bold cursor-pointer"
         >
           <div class="bg-green rounded-lg">
             &#8592; Previous: {data.prev?.name}
           </div>
-        </a>
+        </button>
       {:else}
         <div class="bg-surface2">No previous page</div>
       {/if}
       {#if data.next?.name}
-        <a
-          href={`/docs/${data.next?.location}`}
-          class="underline text-base font-bold"
+        <button
+          onclick={() =>
+            (window.location.href = `/docs/${data.next?.location}`)}
+          class="underline text-base font-bold cursor-pointer"
         >
           <div class="bg-green rounded-lg">
             Next: {data.next?.name}
             &#8594;
           </div>
-        </a>
+        </button>
       {:else}
         <div class="bg-surface2">No next page</div>
       {/if}
@@ -71,7 +83,7 @@
   </div>
   <div class="bg-base w-1/3 min-h-full">
     <div class="sticky top-0">
-      {#each getHeadingList() as heading}
+      {#each headings as heading}
         <div class="p-2">
           <a
             href={`#${heading.id}`}
