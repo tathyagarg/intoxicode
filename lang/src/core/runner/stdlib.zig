@@ -7,7 +7,7 @@ const Literal = @import("../parser/parser.zig").expressions.Literal;
 pub fn scream(self: Runner, args: []Expression) anyerror!Expression {
     var output = std.ArrayList(u8).init(self.allocator);
     for (args) |arg| {
-        try output.appendSlice(try arg.literal.to_string(self.allocator));
+        try output.appendSlice(try arg.literal.to_string(self.allocator, self));
     }
     try self.stdout.writeAll(output.items);
 

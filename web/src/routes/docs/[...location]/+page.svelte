@@ -78,7 +78,7 @@
             class="text-lg font-semibold"
             style={`margin-left: ${heading.level * 20}px;`}
           >
-            {heading.text}
+            {@html heading.text}
           </a>
         </div>
       {/each}

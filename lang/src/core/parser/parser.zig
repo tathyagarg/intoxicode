@@ -512,7 +512,7 @@ pub const Parser = struct {
     }
 
     fn primary(self: *Parser) !Expression {
-        if (self.match(&[_]TokenType{ .Integer, .Float, .String, .Identifier })) {
+        if (self.match(&[_]TokenType{ .Integer, .Float, .String, .Identifier, .Boolean, .Null })) {
             const token = self.previous();
 
             return switch (token.token_type) {
@@ -525,6 +525,16 @@ pub const Parser = struct {
                 .String => Expression{
                     .literal = expressions.Literal{
                         .string = token.value,
+                    },
+                },
+                .Boolean => Expression{
+                    .literal = expressions.Literal{
+                        .boolean = std.mem.eql(u8, token.value, "true"),
+                    },
+                },
+                .Null => Expression{
+                    .literal = expressions.Literal{
+                        .null = null,
                     },
                 },
                 else => unreachable,
@@ -544,6 +554,6 @@ pub const Parser = struct {
             };
         }
 
-        std.debug.panic("Unexpected token: {s}", .{self.peek().value});
+        std.debug.panic("Unexpected token: {s} ({})", .{ self.peek().value, self.peek().token_type });
     }
 };

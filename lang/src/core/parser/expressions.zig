@@ -1,5 +1,6 @@
 const std = @import("std");
 const Token = @import("../lexer/tokens.zig").Token;
+const Runner = @import("../runner/runner.zig").Runner;
 
 pub const Expression = union(enum) {
     binary: Binary,
@@ -198,7 +199,7 @@ pub const Literal = union(enum) {
         return Literal{ .number = number };
     }
 
-    pub fn to_string(self: Literal, allocator: std.mem.Allocator) ![]const u8 {
+    pub fn to_string(self: Literal, allocator: std.mem.Allocator, runner: Runner) ![]const u8 {
         return switch (self) {
             .number => |n| try std.fmt.allocPrint(allocator, "{d}", .{n}),
             .string => |s| {
@@ -233,10 +234,13 @@ pub const Literal = union(enum) {
                 var result = std.ArrayList(u8).init(allocator);
                 try result.append('[');
                 for (arr.items) |item| {
-                    const item_str = try item.pretty_print(allocator);
+                    const item_str = try (try runner.evaluate_expression(item, runner.variables)).literal.to_string(allocator, runner);
                     try result.appendSlice(item_str);
                     try result.appendSlice(", ");
                 }
+                _ = result.pop();
+                _ = result.pop();
+
                 try result.append(']');
                 return result.toOwnedSlice();
             },

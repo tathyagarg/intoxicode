@@ -111,7 +111,7 @@ pub const Runner = struct {
         return null;
     }
 
-    fn evaluate_expression(self: Runner, expr: Expression, variables: *std.StringHashMap(Expression)) anyerror!Expression {
+    pub fn evaluate_expression(self: Runner, expr: Expression, variables: *std.StringHashMap(Expression)) anyerror!Expression {
         return switch (expr) {
             .literal => expr,
             .indexing => |indexing| {
