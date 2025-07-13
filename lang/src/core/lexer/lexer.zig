@@ -67,10 +67,6 @@ pub const Lexer = struct {
         return lexer;
     }
 
-    pub fn deinit(self: *Lexer) void {
-        self.tokens.deinit();
-    }
-
     pub fn scan_tokens(self: *Lexer) !void {
         while (!self.at_end()) {
             self.start_position = self.position;

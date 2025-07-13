@@ -154,18 +154,6 @@ pub const Expression = union(enum) {
         };
     }
 
-    pub fn deinit(self: Expression) void {
-        switch (self) {
-            .binary => |b| {
-                b.left.deinit();
-                b.right.deinit();
-            },
-            .grouping => |g| g.expression.deinit(),
-            .literal => {},
-            .identifier => {},
-        }
-    }
-
     pub fn get_certainty(self: Expression) f32 {
         return switch (self) {
             .binary => self.binary.certainty,
@@ -280,19 +268,9 @@ pub const Call = struct {
     arguments: ?std.ArrayList(Expression),
 
     certainty: f32 = 1.0,
-
-    pub fn deinit(self: Call) void {
-        for (self.arguments.items) |arg| arg.deinit();
-        self.arguments.deinit();
-    }
 };
 
 pub const Indexing = struct {
     array: *const Expression,
     index: *const Expression,
-
-    pub fn deinit(self: Indexing) void {
-        self.array.deinit();
-        self.index.deinit();
-    }
 };

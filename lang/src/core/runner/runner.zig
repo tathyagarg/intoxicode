@@ -169,7 +169,8 @@ pub const Runner = struct {
                                 self.features.uncertainty = false;
                                 self.features.repitition = false;
                             } else {
-                                std.debug.panic("Unknown directive: {s}", .{target});
+                                try self.stderr.print("Unknown directive: {s}\n", .{target});
+                                std.process.exit(1);
                             }
                         },
                         // else => {},
@@ -211,7 +212,11 @@ pub const Runner = struct {
                         .literal = array.items[index].literal,
                     };
                 } else {
-                    return error.IndexOutOfBounds;
+                    try self.stderr.print("Index out of bounds: {d} for array of length {d}\n", .{
+                        index,
+                        array.items.len,
+                    });
+                    std.process.exit(1);
                 }
             },
             .identifier => |id| {
@@ -227,7 +232,8 @@ pub const Runner = struct {
                     };
                 }
 
-                std.debug.panic("Variable not found: {s}", .{id.name});
+                try self.stderr.print("Undefined variable: {s}\n", .{id.name});
+                std.process.exit(1);
             },
             .binary => |binary| {
                 const left = try self.evaluate_expression(binary.left.*, variables);
@@ -248,7 +254,10 @@ pub const Runner = struct {
                                 }),
                             },
                         },
-                        else => return error.InvalidBinaryOperation,
+                        else => {
+                            try self.stderr.print("Invalid left operand for '+' operator: {s}\n", .{try left.literal.to_string(self.allocator, self)});
+                            std.process.exit(1);
+                        },
                     },
                     .Minus => Expression{
                         .literal = Literal{
@@ -262,7 +271,8 @@ pub const Runner = struct {
                     },
                     .Divide => {
                         if (right.literal.number == 0) {
-                            return error.DivisionByZero;
+                            try self.stderr.print("Division by zero error\n", .{});
+                            std.process.exit(1);
                         }
                         return Expression{
                             .literal = Literal{
@@ -272,7 +282,8 @@ pub const Runner = struct {
                     },
                     .Modulo => {
                         if (right.literal.number == 0) {
-                            return error.DivisionByZero;
+                            try self.stderr.print("Modulo by zero error\n", .{});
+                            std.process.exit(1);
                         }
                         return Expression{
                             .literal = Literal{
@@ -310,7 +321,10 @@ pub const Runner = struct {
                             .boolean = left.literal.boolean and right.literal.boolean,
                         },
                     },
-                    else => return error.InvalidBinaryOperation,
+                    else => {
+                        try self.stderr.print("Invalid binary operator: {}\n", .{binary.operator.token_type});
+                        std.process.exit(1);
+                    }
                 };
             },
             .grouping => |group| {
@@ -351,10 +365,14 @@ pub const Runner = struct {
                 } else if (self.functions.get(id.name)) |func_stmt| {
                     return try self.run_function(func_stmt, arguments.items);
                 } else {
-                    return error.FunctionNotFound;
+                    try self.stderr.print("Undefined function: {s}\n", .{id.name});
+                    std.process.exit(1);
                 }
             },
-            else => return error.InvalidFunctionCall,
+            else => {
+                try self.stderr.print("Invalid function call: {s}\n", .{try callee.literal.to_string(self.allocator, self)});
+                std.process.exit(1);
+            }
         }
     }
 
@@ -362,7 +380,12 @@ pub const Runner = struct {
         const func_decl = func.function_declaration;
 
         if (args.len != func_decl.parameters.items.len) {
-            return error.InvalidFunctionArguments;
+            try self.stderr.print("Function '{s}' expects {d} arguments, got {d}\n", .{
+                func_decl.name,
+                func_decl.parameters.items.len,
+                args.len,
+            });
+            std.process.exit(1);
         }
 
         var local_vars = std.StringHashMap(Expression).init(self.allocator);

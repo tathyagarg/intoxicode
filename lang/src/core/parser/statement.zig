@@ -12,19 +12,6 @@ pub const Statement = union(enum) {
     throwaway_statement: ThrowawayStatement,
     directive: Directive,
 
-    pub fn deinit(self: Statement) void {
-        switch (self) {
-            .expression => |e| e.deinit(),
-            .declaration => |d| d.deinit(),
-            .assignment => |a| a.deinit(),
-            .if_statement => |i| i.deinit(),
-            .loop_statement => |l| l.deinit(),
-            .function_declaration => |f| f.deinit(),
-            .try_statement => |t| t.deinit(),
-            .throwaway_statement => |t| t.deinit(),
-        }
-    }
-
     pub fn get_certainty(self: Statement) !f32 {
         return switch (self) {
             .expression => self.expression.get_certainty(),

@@ -18,9 +18,10 @@ pub fn scream(self: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn abs(_: Runner, args: []Expression) anyerror!Expression {
+pub fn abs(r: Runner, args: []Expression) anyerror!Expression {
     if (args.len != 1) {
-        return error.InvalidArgumentCount;
+        try r.stderr.print("abs() requires exactly one argument, got {}\n", .{args.len});
+        std.process.exit(1);
     }
 
     const arg = args[0];
@@ -35,9 +36,10 @@ pub fn abs(_: Runner, args: []Expression) anyerror!Expression {
     }
 }
 
-pub fn min(_: Runner, args: []Expression) anyerror!Expression {
+pub fn min(r: Runner, args: []Expression) anyerror!Expression {
     if (args.len == 0) {
-        return error.InvalidArgumentCount;
+        try r.stderr.print("min() requires at least one argument, got {}\n", .{args.len});
+        std.process.exit(1);
     }
 
     var min_value: ?f32 = null;
@@ -54,9 +56,10 @@ pub fn min(_: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn max(_: Runner, args: []Expression) anyerror!Expression {
+pub fn max(r: Runner, args: []Expression) anyerror!Expression {
     if (args.len == 0) {
-        return error.InvalidArgumentCount;
+        try r.stderr.print("max() requires at least one argument, got {}\n", .{args.len});
+        std.process.exit(1);
     }
 
     var max_value: ?f32 = null;
@@ -73,9 +76,10 @@ pub fn max(_: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn pow(_: Runner, args: []Expression) anyerror!Expression {
+pub fn pow(r: Runner, args: []Expression) anyerror!Expression {
     if (args.len != 2) {
-        return error.InvalidArgumentCount;
+        try r.stderr.print("pow() requires exactly two arguments, got {}\n", .{args.len});
+        std.process.exit(1);
     }
 
     const base = args[0].literal.number;
@@ -88,14 +92,16 @@ pub fn pow(_: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn sqrt(_: Runner, args: []Expression) anyerror!Expression {
+pub fn sqrt(r: Runner, args: []Expression) anyerror!Expression {
     if (args.len != 1) {
-        return error.InvalidArgumentCount;
+        try r.stderr.print("sqrt() requires exactly one argument, got {}\n", .{args.len});
+        std.process.exit(1);
     }
 
     const value = args[0].literal.number;
     if (value < 0) {
-        return error.NegativeSqrt;
+        try r.stderr.print("sqrt() cannot take a negative number, got {}\n", .{value});
+        std.process.exit(1);
     }
 
     return Expression{
@@ -105,9 +111,10 @@ pub fn sqrt(_: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn length(_: Runner, args: []Expression) anyerror!Expression {
+pub fn length(r: Runner, args: []Expression) anyerror!Expression {
     if (args.len != 1) {
-        return error.InvalidArgumentCount;
+        try r.stderr.print("length() requires exactly one argument, got {}\n", .{args.len});
+        std.process.exit(1);
     }
 
     const arg = args[0];
@@ -128,7 +135,8 @@ pub fn length(_: Runner, args: []Expression) anyerror!Expression {
 
 pub fn to_string(self: Runner, args: []Expression) anyerror!Expression {
     if (args.len != 1) {
-        return error.InvalidArgumentCount;
+        try self.stderr.print("to_string() requires exactly one argument, got {}\n", .{args.len});
+        std.process.exit(1);
     }
 
     const arg = args[0];
