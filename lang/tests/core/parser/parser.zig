@@ -8,11 +8,22 @@ const Expression = expressions.Expression;
 const Token = @import("intoxicode").lexer.tokens.Token;
 const TokenType = @import("intoxicode").lexer.tokens.TokenType;
 
+const Runner = @import("intoxicode").runner.Runner;
+const Statement = @import("intoxicode").parser.statements.Statement;
+
 test "core.parser.parser.basic" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
     const allocator = arena.allocator();
+
+    var stdout = std.ArrayList(u8).init(allocator);
+    defer stdout.deinit();
+
+    var stderr = std.ArrayList(u8).init(allocator);
+    defer stderr.deinit();
+
+    const runner = try Runner.init(allocator, stdout.writer().any(), stderr.writer().any(), &[_]*Statement{});
 
     var tokens = std.ArrayList(Token).init(std.testing.allocator);
     defer tokens.deinit();
@@ -32,7 +43,7 @@ test "core.parser.parser.basic" {
     defer statements.deinit();
 
     try std.testing.expect(
-        statements.items[0].expression.equals(
+        try statements.items[0].expression.equals(
             Expression{
                 .binary = expressions.Binary{
                     .left = &Expression{ .literal = expressions.Literal{ .number = 42.1 } },
@@ -46,6 +57,7 @@ test "core.parser.parser.basic" {
                     } },
                 },
             },
+            runner,
         ),
     );
 }
@@ -55,6 +67,14 @@ test "core.parser.parser.assign" {
     defer arena.deinit();
 
     const allocator = arena.allocator();
+
+    var stdout = std.ArrayList(u8).init(allocator);
+    defer stdout.deinit();
+
+    var stderr = std.ArrayList(u8).init(allocator);
+    defer stderr.deinit();
+
+    const runner = try Runner.init(allocator, stdout.writer().any(), stderr.writer().any(), &[_]*Statement{});
 
     var tokens = std.ArrayList(Token).init(std.testing.allocator);
     defer tokens.deinit();
@@ -75,22 +95,31 @@ test "core.parser.parser.assign" {
     );
 
     try std.testing.expect(
-        statements.items[0].assignment.expression.equals(
+        try statements.items[0].assignment.expression.equals(
             Expression{ .literal = expressions.Literal{ .number = 42.1 } },
+            runner,
         ),
     );
 }
 
-test "core.parser.parser.function_call" {
+test "function_call" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
 
     const allocator = arena.allocator();
 
+    var stdout = std.ArrayList(u8).init(allocator);
+    defer stdout.deinit();
+
+    var stderr = std.ArrayList(u8).init(allocator);
+    defer stderr.deinit();
+
+    const runner = try Runner.init(allocator, stdout.writer().any(), stderr.writer().any(), &[_]*Statement{});
+
     var tokens = std.ArrayList(Token).init(std.testing.allocator);
     defer tokens.deinit();
 
-    try tokens.append(Token{ .token_type = .Identifier, .value = "print" });
+    try tokens.append(Token{ .token_type = .Identifier, .value = "scream" });
     try tokens.append(Token{ .token_type = .LeftParen, .value = "(" });
     try tokens.append(Token{ .token_type = .String, .value = "\"Hello, World!\"" });
     try tokens.append(Token{ .token_type = .Comma, .value = "," });
@@ -110,13 +139,9 @@ test "core.parser.parser.function_call" {
     try expected_args.append(Expression{ .literal = expressions.Literal{ .number = 3.14 } });
 
     try std.testing.expect(
-        statements.items[0].expression.equals(
-            Expression{
-                .call = expressions.Call{
-                    .callee = &Expression{ .identifier = expressions.Identifier{ .name = "print" } },
-                    .arguments = expected_args,
-                },
-            },
+        try statements.items[0].expression.call.callee.equals(
+            Expression{ .identifier = expressions.Identifier{ .name = "scream" } },
+            runner,
         ),
     );
 }
@@ -127,6 +152,12 @@ test "if" {
 
     const allocator = arena.allocator();
 
+    var stdout = std.ArrayList(u8).init(allocator);
+    defer stdout.deinit();
+
+    var stderr = std.ArrayList(u8).init(allocator);
+    defer stderr.deinit();
+
     var tokens = std.ArrayList(Token).init(std.testing.allocator);
     defer tokens.deinit();
 
@@ -134,6 +165,36 @@ test "if" {
     try tokens.append(Token{ .token_type = .Identifier, .value = "1" });
     try tokens.append(Token{ .token_type = .GreaterThan, .value = ">" });
     try tokens.append(Token{ .token_type = .Identifier, .value = "0" });
+    try tokens.append(Token{ .token_type = .LeftBrace, .value = "{" });
+    try tokens.append(Token{ .token_type = .Identifier, .value = "scream" });
+    try tokens.append(Token{ .token_type = .LeftParen, .value = "(" });
+    try tokens.append(Token{ .token_type = .String, .value = "\"Hello, World!\"" });
+    try tokens.append(Token{ .token_type = .RightParen, .value = ")" });
+    try tokens.append(Token{ .token_type = .Period, .value = "." });
+    try tokens.append(Token{ .token_type = .RightBrace, .value = "}" });
+    try tokens.append(Token{ .token_type = .Period, .value = "." });
+    try tokens.append(Token{ .token_type = .EOF, .value = "" });
+
+    var p = Parser.init(tokens, allocator);
+    const statements = try p.parse();
+    defer statements.deinit();
+}
+
+test "loop" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+
+    const allocator = arena.allocator();
+
+    var tokens = std.ArrayList(Token).init(std.testing.allocator);
+    defer tokens.deinit();
+
+    try tokens.append(Token{ .token_type = .Loop, .value = "loop" });
+    try tokens.append(Token{ .token_type = .LeftParen, .value = "(" });
+    try tokens.append(Token{ .token_type = .Identifier, .value = "i" });
+    try tokens.append(Token{ .token_type = .GreaterThan, .value = ">" });
+    try tokens.append(Token{ .token_type = .Integer, .value = "0" });
+    try tokens.append(Token{ .token_type = .RightParen, .value = ")" });
     try tokens.append(Token{ .token_type = .LeftBrace, .value = "{" });
     try tokens.append(Token{ .token_type = .Identifier, .value = "scream" });
     try tokens.append(Token{ .token_type = .LeftParen, .value = "(" });

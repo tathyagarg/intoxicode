@@ -1,5 +1,5 @@
 # Flow Control
-There is only one way to control the flow of execution in Intoxicode: through conditionals. Loops are **not yet supported**, but are planned for future releases.
+Intoxicode has 2 types of flow control: conditionals and loops. Conditionals allow you to execute different blocks of code based on certain conditions, while loops allow you to repeat a block of code multiple times.
 
 ## Conditionals
 Conditionals allow you to execute different blocks of code based on certain conditions. The syntax is about how you'd expect. There is one important thing to note, however: Intoxicode does not support `else if` statements. Instead, you can use multiple `if` statements in sequence.
@@ -25,4 +25,10 @@ if condition1 {
 Again, note the use of a certainty modifier at the end of the `else` blocks.
 
 ## Loops
-Not supported (yet!)
+Loops allow you to repeat a block of code multiple times. There is one type of loop in Intoxicode: the `loop`. It's analogous to the `while` loop in other languages.
+
+```intox
+loop condition {
+  ...
+}.
+```

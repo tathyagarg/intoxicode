@@ -67,7 +67,8 @@ pub const Statement = union(enum) {
             .if_statement => self.if_statement.pretty_print(allocator),
             .function_declaration => self.function_declaration.pretty_print(allocator),
             .throwaway_statement => self.throwaway_statement.pretty_print(allocator),
-            else => unreachable,
+            .loop_statement => self.loop_statement.pretty_print(allocator),
+            .try_statement => self.try_statement.pretty_print(allocator),
         };
     }
 };
@@ -130,6 +131,26 @@ pub const LoopStatement = struct {
         for (self.body.items) |s| s.deinit();
         self.body.deinit();
     }
+
+    pub fn pretty_print(self: LoopStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
+        var builder = std.ArrayList(u8).init(allocator);
+        defer builder.deinit();
+
+        try builder.appendSlice("while (");
+        try builder.appendSlice(try self.condition.pretty_print(allocator));
+        try builder.appendSlice(") {\n");
+
+        for (self.body.items) |s| {
+            try builder.appendSlice("    ");
+            try builder.appendSlice(try s.pretty_print(allocator));
+            try builder.appendSlice("\n");
+        }
+
+        try builder.appendSlice("}\n");
+
+        const result = try builder.toOwnedSlice();
+        return result;
+    }
 };
 
 pub const FunctionDeclaration = struct {
@@ -187,6 +208,32 @@ pub const TryStatement = struct {
         self.expression.deinit();
         for (self.catch_block.items) |s| s.deinit();
         self.catch_block.deinit();
+    }
+
+    pub fn pretty_print(self: TryStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
+        var builder = std.ArrayList(u8).init(allocator);
+        defer builder.deinit();
+
+        try builder.appendSlice("try {\n");
+
+        for (self.body.items) |s| {
+            try builder.appendSlice("    ");
+            try builder.appendSlice(try s.pretty_print(allocator));
+            try builder.appendSlice("\n");
+        }
+
+        try builder.appendSlice("} gotcha {\n");
+
+        for (self.catch_block.items) |s| {
+            try builder.appendSlice("    ");
+            try builder.appendSlice(try s.pretty_print(allocator));
+            try builder.appendSlice("\n");
+        }
+
+        try builder.appendSlice("}\n");
+
+        const result = try builder.toOwnedSlice();
+        return result;
     }
 };
 

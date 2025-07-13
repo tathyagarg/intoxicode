@@ -62,12 +62,7 @@ pub fn main() !void {
     var parser = Parser.init(lexer.tokens, allocator);
     const statements = try parser.parse();
 
-    // std.debug.print("Parsed statements:\n\n{s}\n", .{try statements.items[0].pretty_print(allocator)});
+    const runner = try Runner.init(allocator, stdout.any(), stderr.any(), statements.items);
 
-    const runner = try Runner.init(allocator, stdout.any(), stderr.any());
-
-    _ = try runner.run(
-        statements.items,
-        runner.variables,
-    );
+    _ = try runner.run();
 }

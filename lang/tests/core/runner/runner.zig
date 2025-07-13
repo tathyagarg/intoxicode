@@ -17,8 +17,6 @@ test "basic" {
     var stderr = std.ArrayList(u8).init(allocator);
     defer stderr.deinit();
 
-    const runner = try Runner.init(allocator, stdout.writer().any(), stderr.writer().any());
-
     var arguments = std.ArrayList(Expression).init(allocator);
 
     try arguments.append(Expression{
@@ -50,9 +48,13 @@ test "basic" {
 
     try statements.append(&stmt1);
 
-    try runner.run(
+    const runner = try Runner.init(
+        allocator,
+        stdout.writer().any(),
+        stderr.writer().any(),
         statements.items,
     );
+    try runner.run();
 
     try std.testing.expectEqualStrings(
         "42Hello, World!\n",
@@ -71,8 +73,6 @@ test "variables" {
 
     var stderr = std.ArrayList(u8).init(allocator);
     defer stderr.deinit();
-
-    const runner = try Runner.init(allocator, stdout.writer().any(), stderr.writer().any());
 
     var statements = std.ArrayList(*Statement).init(allocator);
 
@@ -110,9 +110,8 @@ test "variables" {
 
     try statements.append(&stmt2);
 
-    try runner.run(
-        statements.items,
-    );
+    const runner = try Runner.init(allocator, stdout.writer().any(), stderr.writer().any(), statements.items);
+    try runner.run();
 
     try std.testing.expectEqualStrings(
         "10",

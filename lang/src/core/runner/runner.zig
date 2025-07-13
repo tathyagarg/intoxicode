@@ -17,13 +17,18 @@ pub const Runner = struct {
 
     variables: *std.StringHashMap(Expression),
     functions: *std.StringHashMap(Statement),
+    statements: []*Statement,
 
     std_functions: std.StringHashMap(StdFunction),
+
+    certain_count: *usize,
+    max_certains_available: usize,
 
     pub fn init(
         allocator: std.mem.Allocator,
         stdout: std.io.AnyWriter,
         stderr: std.io.AnyWriter,
+        statements: []*Statement,
     ) !Runner {
         const variables = try allocator.create(std.StringHashMap(Expression));
         variables.* = std.StringHashMap(Expression).init(allocator);
@@ -40,13 +45,22 @@ pub const Runner = struct {
         std_functions.putNoClobber("sqrt", stdlib.sqrt) catch unreachable;
         std_functions.putNoClobber("length", stdlib.length) catch unreachable;
 
+        const certain_count = try allocator.create(usize);
+        certain_count.* = 0;
+
         return Runner{
             .allocator = allocator,
+
             .variables = variables,
             .functions = functions,
+            .statements = statements,
+
             .stdout = stdout,
             .stderr = stderr,
             .std_functions = std_functions,
+
+            .certain_count = certain_count,
+            .max_certains_available = @max(2, statements.len / 4),
         };
     }
 
@@ -54,13 +68,28 @@ pub const Runner = struct {
         self.variables.deinit();
     }
 
-    pub fn run(self: Runner, statements: []*Statement, variables: *std.StringHashMap(Expression)) !?Expression {
+    pub fn run(self: Runner) !void {
+        _ = try self.run_snippet(self.statements, self.variables);
+    }
+
+    fn run_snippet(self: Runner, statements: []*Statement, variables: *std.StringHashMap(Expression)) !?Expression {
         for (statements) |statement| {
-            const certainty = try statement.get_certainty();
+            var certainty = try statement.get_certainty();
+            if (certainty == 1) {
+                if (self.certain_count.* >= self.max_certains_available) {
+                    certainty = 0.75;
+                } else {
+                    self.certain_count.* = self.certain_count.* + 1;
+                }
+            }
+
             const roll = std.crypto.random.float(f32);
 
             if (roll <= certainty) {
-                const repetition = std.math.log10(std.math.maxInt(u16)) - std.math.log10(std.crypto.random.int(u16)) + 1;
+                const repetition_roll = std.crypto.random.float(f32);
+                const repetition: usize = if (repetition_roll < 0.75)
+                    @as(usize, 1)
+                else if (repetition_roll < 0.95) @as(usize, 2) else @as(usize, 3);
 
                 for (0..repetition) |_| {
                     switch (statement.*) {
@@ -76,26 +105,20 @@ pub const Runner = struct {
                         .if_statement => |if_stmt| {
                             const condition = try self.evaluate_expression(if_stmt.condition, variables);
                             if (condition.literal.boolean) {
-                                _ = try self.run(if_stmt.then_branch.items, variables);
+                                return try self.run_snippet(if_stmt.then_branch.items, variables);
                             } else if (if_stmt.else_branch) |else_branch| {
-                                _ = try self.run(else_branch.items, variables);
+                                return try self.run_snippet(else_branch.items, variables);
                             }
                         },
                         .function_declaration => |func_decl| {
-                            const key = func_decl.name;
-
-                            // if (self.functions.get(key) == null) {
-                            try self.functions.put(key, statement.*);
-                            // } else {
-                            //     return error.FunctionAlreadyExists;
-                            // }
+                            try self.functions.put(func_decl.name, statement.*);
                         },
                         .throwaway_statement => |throwaway| {
                             return try self.evaluate_expression(throwaway.expression, variables);
                         },
                         .try_statement => |try_stmt| {
-                            if (self.run(try_stmt.body.items, variables) catch {
-                                if (try self.run(try_stmt.catch_block.items, variables)) |catch_result| {
+                            if (self.run_snippet(try_stmt.body.items, variables) catch {
+                                if (try self.run_snippet(try_stmt.catch_block.items, variables)) |catch_result| {
                                     return catch_result;
                                 }
 
@@ -104,7 +127,18 @@ pub const Runner = struct {
                                 return result;
                             }
                         },
-                        else => {},
+                        .loop_statement => |loop_stmt| {
+                            while (true) {
+                                const condition = try self.evaluate_expression(loop_stmt.condition, variables);
+                                if (!condition.literal.boolean) {
+                                    break;
+                                }
+                                if (try self.run_snippet(loop_stmt.body.items, variables)) |result| {
+                                    return result;
+                                }
+                            }
+                        },
+                        // else => {},
                     }
                 }
             }
@@ -159,7 +193,7 @@ pub const Runner = struct {
                     };
                 }
 
-                return error.VariableNotFound;
+                std.debug.panic("Variable not found: {s}", .{id.name});
             },
             .binary => |binary| {
                 const left = try self.evaluate_expression(binary.left.*, variables);
@@ -284,7 +318,7 @@ pub const Runner = struct {
         }
 
         // Run the function body
-        if (try self.run(func_decl.body.items, &local_vars)) |result|
+        if (try self.run_snippet(func_decl.body.items, &local_vars)) |result|
             return result;
 
         return Expression{

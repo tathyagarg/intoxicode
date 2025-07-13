@@ -68,7 +68,7 @@ pub const Parser = struct {
         return false;
     }
 
-    pub fn parse(self: *Parser) error{ OutOfMemory, InvalidCharacter }!std.ArrayList(*Statement) {
+    pub fn parse(self: *Parser) anyerror!std.ArrayList(*Statement) {
         var stmts = std.ArrayList(*Statement).init(self.allocator);
 
         while (!self.is_at_end()) {
@@ -79,7 +79,7 @@ pub const Parser = struct {
         return stmts;
     }
 
-    fn statement(self: *Parser) error{ OutOfMemory, InvalidCharacter }!*Statement {
+    fn statement(self: *Parser) anyerror!*Statement {
         const found_stmt = if (self.match(&[_]TokenType{.If}))
             try self.if_statement()
         else if (self.match(&[_]TokenType{.Loop}))
@@ -99,7 +99,11 @@ pub const Parser = struct {
         const certainty: f32 = switch (next.token_type) {
             .Period => 1.0,
             .QuestionMark => 0.75,
-            else => std.debug.panic("Unexpected token after statement: {s}", .{next.value}),
+            else => std.debug.panic("Unexpected token after statement: {s} in statement: {s}\n-> {s}", .{
+                next.value,
+                @tagName(found_stmt.*),
+                try found_stmt.pretty_print(self.allocator),
+            }),
         };
 
         found_stmt.set_certainty(certainty);
@@ -213,15 +217,16 @@ pub const Parser = struct {
 
     fn loop_statement(self: *Parser) !*Statement {
         const condition = try self.expression();
-        _ = try self.consume(.LeftParen, "Expected '(' after 'loop'.");
+        _ = try self.consume(.LeftBrace, "Expected '{' to start loop body.");
 
         var body = std.ArrayList(*Statement).init(self.allocator);
-        defer body.deinit();
 
-        while (!self.is_at_end()) {
+        while (!self.is_at_end() and !self.check(.RightBrace)) {
             const stmt = try self.statement();
             try body.append(stmt);
         }
+
+        _ = try self.consume(.RightBrace, "Expected '}' to end loop body.");
 
         const stmt = try self.allocator.create(Statement);
         stmt.* = Statement{

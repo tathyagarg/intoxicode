@@ -1,0 +1,14 @@
+fun awesome(x) {
+  loop x > 0 {
+      scream("Yay!\n").
+      x = x - 1.
+
+      if x == 2 {
+          throwaway "shithole\n".
+      }.
+  }.
+
+  throwaway "done!\n".
+}.
+
+scream(awesome(5)).

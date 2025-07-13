@@ -25,11 +25,9 @@ test "max" {
     var parser = Parser.init(lexer.tokens, allocator);
     const statements = try parser.parse();
 
-    const runner = try Runner.init(allocator, stdout.writer().any(), stderr.writer().any());
+    const runner = try Runner.init(allocator, stdout.writer().any(), stderr.writer().any(), statements.items);
 
-    try runner.run(
-        statements.items,
-    );
+    try runner.run();
 
     try std.testing.expectEqualStrings(
         "2",

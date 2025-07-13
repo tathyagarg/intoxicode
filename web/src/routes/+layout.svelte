@@ -4,6 +4,21 @@
   let { children } = $props();
 </script>
 
+<svelte:head>
+  <meta property="og:title" content="Intoxicode - An esolang" />
+  <meta
+    property="og:description"
+    content="Run code like a drunk person would write it"
+  />
+  <meta
+    name="description"
+    content="Run code like a drunk person would write it"
+  />
+  <meta property="og:site_name" content="arson.dev" />
+  <meta property="og:url" content="https://intoxicode.arson.dev" />
+  <meta property="og:image" content="/assets/preview.png" />
+</svelte:head>
+
 <div
   class="bg-crust text-subtext0 p-4 flex items-center gap-8 *:hover:text-text"
 >
