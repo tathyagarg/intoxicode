@@ -13,14 +13,12 @@ pub const Keywords = [_]Pair{
     .{ .key = "if", .value = .If },
     .{ .key = "else", .value = .Else },
     .{ .key = "loop", .value = .Loop },
-    .{ .key = "puke", .value = .Puke },
     .{ .key = "fun", .value = .Fun },
     .{ .key = "throwaway", .value = .Throwaway },
     .{ .key = "try", .value = .Try },
     .{ .key = "gotcha", .value = .Gotcha },
     .{ .key = "and", .value = .And },
     .{ .key = "or", .value = .Or },
-    .{ .key = "not", .value = .Not },
     .{ .key = "null", .value = .Null },
     .{ .key = "true", .value = .Boolean },
     .{ .key = "false", .value = .Boolean },
@@ -112,6 +110,7 @@ pub const Lexer = struct {
             '?' => try self.add_token(TokenType.QuestionMark),
             ',' => try self.add_token(TokenType.Comma),
             '#' => while (!self.at_end() and self.current_char != '\n') self.advance(),
+            '@' => try self.add_token(.Directive),
             '=' => {
                 if (self.peek() == '=') {
                     self.advance(); // Consume the '='
@@ -150,13 +149,16 @@ pub const Lexer = struct {
             '"' => {
                 self.advance(); // Consume the opening quote
 
+                const start = self.position;
                 while (!self.at_end() and self.current_char != '"') self.advance();
+                const end = self.position;
 
                 if (self.current_char != '"') {
                     return error.UnterminatedString; // Unterminated string literal
                 }
 
-                try self.add_token(TokenType.String);
+                try self.add_raw_token(Token.init(TokenType.String, self.input[start - 1 .. end - 1]));
+                //std.debug.print("String: {s}\n", .{self.tokens.items[self.tokens.items.len - 1].value});
             },
             '0'...'9' => try self.add_token(try self.number()),
             ' ', '\n', '\r', '\t' => {}, // Ignore whitespace

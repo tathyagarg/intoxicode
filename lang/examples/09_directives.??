@@ -1,0 +1,33 @@
+@all.
+
+fun is_prime(num) {
+  if num < 2 {
+    throwaway false.
+  }.
+
+  checking = 2.
+  loop checking < num {
+    if num % checking == 0 {
+      throwaway false.
+    }.
+    checking = checking + 1.
+  }.
+
+  throwaway true.
+}.
+
+fun display_nicely(num) {
+  scream(to_string(num) + " is ").
+  if (is_prime(num)) {
+      scream("a prime number!\n").
+  } else {
+      scream("not a prime nuber :(\n").
+  }.
+}.
+
+curr = 1.
+
+loop curr < 100 {
+    display_nicely(curr).
+    curr = curr + 1.
+}.

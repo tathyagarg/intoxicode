@@ -39,7 +39,6 @@ pub const TokenType = enum {
     Else,
 
     Loop,
-    Puke,
 
     Fun,
     Throwaway, // return
@@ -51,7 +50,8 @@ pub const TokenType = enum {
 
     And,
     Or,
-    Not,
+
+    Directive,
 
     EOF,
 };

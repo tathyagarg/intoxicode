@@ -125,3 +125,16 @@ pub fn length(_: Runner, args: []Expression) anyerror!Expression {
         else => error.InvalidArgumentType,
     };
 }
+
+pub fn to_string(self: Runner, args: []Expression) anyerror!Expression {
+    if (args.len != 1) {
+        return error.InvalidArgumentCount;
+    }
+
+    const arg = args[0];
+    return Expression{
+        .literal = Literal{
+            .string = try arg.literal.to_string(self.allocator, self),
+        },
+    };
+}

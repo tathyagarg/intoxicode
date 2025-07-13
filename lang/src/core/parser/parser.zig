@@ -92,6 +92,8 @@ pub const Parser = struct {
             try self.throwaway_statement()
         else if (self.match(&[_]TokenType{.Identifier}))
             try self.assignment_or_expression()
+        else if (self.match(&[_]TokenType{.Directive}))
+            try self.directive()
         else
             try self.expression_statement();
 
@@ -109,6 +111,18 @@ pub const Parser = struct {
         found_stmt.set_certainty(certainty);
 
         return found_stmt;
+    }
+
+    fn directive(self: *Parser) !*Statement {
+        const feature = try self.consume(.Identifier, "Expected feature name after '@'");
+        const stmt = try self.allocator.create(Statement);
+        stmt.* = Statement{
+            .directive = statements.Directive{
+                .name = feature.value,
+            },
+        };
+
+        return stmt;
     }
 
     fn expression_statement(self: *Parser) !*Statement {
@@ -440,7 +454,7 @@ pub const Parser = struct {
     fn factor(self: *Parser) !Expression {
         var expr = try self.indexing();
 
-        while (self.match(&[_]TokenType{ .Multiply, .Divide })) {
+        while (self.match(&[_]TokenType{ .Multiply, .Divide, .Modulo })) {
             const operator = self.previous();
 
             const right = try self.allocator.create(Expression);

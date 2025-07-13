@@ -10,6 +10,7 @@ pub const Statement = union(enum) {
     function_declaration: FunctionDeclaration,
     try_statement: TryStatement,
     throwaway_statement: ThrowawayStatement,
+    directive: Directive,
 
     pub fn deinit(self: Statement) void {
         switch (self) {
@@ -33,6 +34,7 @@ pub const Statement = union(enum) {
             .function_declaration => self.function_declaration.certainty,
             .try_statement => self.try_statement.certainty,
             .throwaway_statement => self.throwaway_statement.certainty,
+            .directive => 1.0,
         };
     }
 
@@ -45,12 +47,13 @@ pub const Statement = union(enum) {
             .function_declaration => |*f| f.certainty = certainty,
             .try_statement => |*t| t.certainty = certainty,
             .throwaway_statement => |*t| t.certainty = certainty,
+            .directive => {},
         }
     }
 
     pub fn pretty_print(self: Statement, allocator: std.mem.Allocator) ![]const u8 {
         return switch (self) {
-            .expression => self.expression.pretty_print(allocator),
+            .expression => |e| e.pretty_print(allocator),
             .assignment => |a| {
                 var builder = std.ArrayList(u8).init(allocator);
 
@@ -64,11 +67,12 @@ pub const Statement = union(enum) {
 
                 return try builder.toOwnedSlice();
             },
-            .if_statement => self.if_statement.pretty_print(allocator),
-            .function_declaration => self.function_declaration.pretty_print(allocator),
-            .throwaway_statement => self.throwaway_statement.pretty_print(allocator),
-            .loop_statement => self.loop_statement.pretty_print(allocator),
-            .try_statement => self.try_statement.pretty_print(allocator),
+            .if_statement => |i| i.pretty_print(allocator),
+            .function_declaration => |f| f.pretty_print(allocator),
+            .throwaway_statement => |t| t.pretty_print(allocator),
+            .loop_statement => |l| l.pretty_print(allocator),
+            .try_statement => |t| t.pretty_print(allocator),
+            .directive => |d| d.pretty_print(allocator),
         };
     }
 };
@@ -78,10 +82,6 @@ pub const Assignment = struct {
     expression: Expression,
 
     certainty: f32 = 1.0,
-
-    pub fn deinit(self: Assignment) void {
-        self.expression.deinit();
-    }
 };
 
 pub const IfStatement = struct {
@@ -90,16 +90,6 @@ pub const IfStatement = struct {
     else_branch: ?std.ArrayList(*Statement),
 
     certainty: f32 = 1.0,
-
-    pub fn deinit(self: IfStatement) void {
-        self.condition.deinit();
-        for (self.then_branch.items) |s| s.deinit();
-        self.then_branch.deinit();
-        if (self.else_branch) |else_branch| {
-            for (else_branch.items) |s| s.deinit();
-            else_branch.deinit();
-        }
-    }
 
     pub fn pretty_print(self: IfStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
         var builder = std.ArrayList(u8).init(allocator);
@@ -125,12 +115,6 @@ pub const LoopStatement = struct {
     body: std.ArrayList(*Statement),
 
     certainty: f32 = 1.0,
-
-    pub fn deinit(self: LoopStatement) void {
-        self.condition.deinit();
-        for (self.body.items) |s| s.deinit();
-        self.body.deinit();
-    }
 
     pub fn pretty_print(self: LoopStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
         var builder = std.ArrayList(u8).init(allocator);
@@ -159,13 +143,6 @@ pub const FunctionDeclaration = struct {
     body: std.ArrayList(*Statement),
 
     certainty: f32 = 1.0,
-
-    pub fn deinit(self: FunctionDeclaration) void {
-        for (self.parameters.items) |param| std.mem.free(param);
-        self.parameters.deinit();
-        for (self.body.items) |s| s.deinit();
-        self.body.deinit();
-    }
 
     pub fn pretty_print(self: FunctionDeclaration, allocator: std.mem.Allocator) anyerror![]const u8 {
         var builder = std.ArrayList(u8).init(allocator);
@@ -204,12 +181,6 @@ pub const TryStatement = struct {
 
     certainty: f32 = 1.0,
 
-    pub fn deinit(self: TryStatement) void {
-        self.expression.deinit();
-        for (self.catch_block.items) |s| s.deinit();
-        self.catch_block.deinit();
-    }
-
     pub fn pretty_print(self: TryStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
         var builder = std.ArrayList(u8).init(allocator);
         defer builder.deinit();
@@ -242,10 +213,6 @@ pub const ThrowawayStatement = struct {
 
     certainty: f32 = 1.0,
 
-    pub fn deinit(self: ThrowawayStatement) void {
-        self.expression.deinit();
-    }
-
     pub fn pretty_print(self: ThrowawayStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
         var builder = std.ArrayList(u8).init(allocator);
         defer builder.deinit();
@@ -253,6 +220,20 @@ pub const ThrowawayStatement = struct {
         try builder.appendSlice("throwaway: ");
         try builder.appendSlice(try self.expression.pretty_print(allocator));
         try builder.appendSlice(";");
+
+        return try builder.toOwnedSlice();
+    }
+};
+
+pub const Directive = struct {
+    name: []const u8,
+
+    pub fn pretty_print(self: Directive, allocator: std.mem.Allocator) anyerror![]const u8 {
+        var builder = std.ArrayList(u8).init(allocator);
+        defer builder.deinit();
+
+        try builder.appendSlice("@");
+        try builder.appendSlice(self.name);
 
         return try builder.toOwnedSlice();
     }

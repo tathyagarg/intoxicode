@@ -44,4 +44,10 @@ scream(length("Hello, World!")).
 scream(length([1, 2, 3, 4, 5])).
 ```
 
+## `to_string`
+The `to_string` function converts a value to a string. It can take any data type as an argument and will return its string representation.
+```intox
+scream(to_string(42)).
+```
+
 More functions may be added in the future, and they will be documented here.

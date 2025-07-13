@@ -54,6 +54,11 @@ const paths: Record<string, Path> = {
   'built-in-functions': {
     name: 'Built-in Functions',
     prev: 'exception-handling',
+    next: 'directives'
+  },
+  'directives': {
+    name: 'Directives',
+    prev: 'built-in-functions',
   },
 }
 

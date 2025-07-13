@@ -218,7 +218,7 @@ pub const Literal = union(enum) {
         return switch (self) {
             .number => |n| try std.fmt.allocPrint(allocator, "{d}", .{n}),
             .string => |s| {
-                const removed_quotes = s[1 .. s.len - 1];
+                const removed_quotes = s;
 
                 var result = std.ArrayList(u8).init(allocator);
 

@@ -10,6 +10,14 @@ const StdFunction = *const fn (Runner, []Expression) anyerror!Expression;
 
 const stdlib = @import("stdlib.zig");
 
+const FeatureFlags = struct {
+    uncertainty: bool = true,
+    repitition: bool = true,
+};
+
+const WEIGHT_ARRAY = [_]u8{ 1, 1, 1, 1, 1, 2, 2, 2, 3 };
+const WEIGHT_LENGTH = WEIGHT_ARRAY.len;
+
 pub const Runner = struct {
     allocator: std.mem.Allocator,
     stdout: std.io.AnyWriter,
@@ -23,6 +31,8 @@ pub const Runner = struct {
 
     certain_count: *usize,
     max_certains_available: usize,
+
+    features: *FeatureFlags,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -44,9 +54,13 @@ pub const Runner = struct {
         std_functions.putNoClobber("pow", stdlib.pow) catch unreachable;
         std_functions.putNoClobber("sqrt", stdlib.sqrt) catch unreachable;
         std_functions.putNoClobber("length", stdlib.length) catch unreachable;
+        std_functions.putNoClobber("to_string", stdlib.to_string) catch unreachable;
 
         const certain_count = try allocator.create(usize);
         certain_count.* = 0;
+
+        const features = try allocator.create(FeatureFlags);
+        features.* = .{};
 
         return Runner{
             .allocator = allocator,
@@ -61,35 +75,41 @@ pub const Runner = struct {
 
             .certain_count = certain_count,
             .max_certains_available = @max(2, statements.len / 4),
-        };
-    }
 
-    pub fn deinit(self: Runner) void {
-        self.variables.deinit();
+            .features = features,
+        };
     }
 
     pub fn run(self: Runner) !void {
         _ = try self.run_snippet(self.statements, self.variables);
     }
 
+    fn calculate_certainty(self: Runner, statement: Statement) !f32 {
+        if (!self.features.uncertainty) {
+            return 1.0;
+        }
+        var certainty = try statement.get_certainty();
+        if (certainty == 1) {
+            if (self.certain_count.* >= self.max_certains_available) {
+                certainty = 0.75;
+            } else {
+                self.certain_count.* = self.certain_count.* + 1;
+            }
+        }
+
+        return certainty;
+    }
+
     fn run_snippet(self: Runner, statements: []*Statement, variables: *std.StringHashMap(Expression)) !?Expression {
         for (statements) |statement| {
-            var certainty = try statement.get_certainty();
-            if (certainty == 1) {
-                if (self.certain_count.* >= self.max_certains_available) {
-                    certainty = 0.75;
-                } else {
-                    self.certain_count.* = self.certain_count.* + 1;
-                }
-            }
-
+            const certainty = try self.calculate_certainty(statement.*);
             const roll = std.crypto.random.float(f32);
 
-            if (roll <= certainty) {
-                const repetition_roll = std.crypto.random.float(f32);
-                const repetition: usize = if (repetition_roll < 0.75)
-                    @as(usize, 1)
-                else if (repetition_roll < 0.95) @as(usize, 2) else @as(usize, 3);
+            if ((roll <= certainty) or !self.features.uncertainty) {
+                const repetition: u8 = if (!self.features.repitition)
+                    1
+                else
+                    WEIGHT_ARRAY[std.crypto.random.intRangeAtMost(u8, 0, WEIGHT_LENGTH - 1)];
 
                 for (0..repetition) |_| {
                     switch (statement.*) {
@@ -136,6 +156,20 @@ pub const Runner = struct {
                                 if (try self.run_snippet(loop_stmt.body.items, variables)) |result| {
                                     return result;
                                 }
+                            }
+                        },
+                        .directive => |directive| {
+                            const target = directive.name;
+
+                            if (std.mem.eql(u8, target, "uncertainty")) {
+                                self.features.uncertainty = false;
+                            } else if (std.mem.eql(u8, target, "repitition")) {
+                                self.features.repitition = false;
+                            } else if (std.mem.eql(u8, target, "all")) {
+                                self.features.uncertainty = false;
+                                self.features.repitition = false;
+                            } else {
+                                std.debug.panic("Unknown directive: {s}", .{target});
                             }
                         },
                         // else => {},
@@ -200,10 +234,21 @@ pub const Runner = struct {
                 const right = try self.evaluate_expression(binary.right.*, variables);
 
                 return switch (binary.operator.token_type) {
-                    .Plus => Expression{
-                        .literal = Literal{
-                            .number = left.literal.number + right.literal.number,
+                    .Plus => switch (left.literal) {
+                        .number => Expression{
+                            .literal = Literal{
+                                .number = left.literal.number + right.literal.number,
+                            },
                         },
+                        .string => Expression{
+                            .literal = Literal{
+                                .string = try std.fmt.allocPrint(self.allocator, "{s}{s}", .{
+                                    left.literal.string,
+                                    right.literal.string,
+                                }),
+                            },
+                        },
+                        else => return error.InvalidBinaryOperation,
                     },
                     .Minus => Expression{
                         .literal = Literal{
@@ -222,6 +267,16 @@ pub const Runner = struct {
                         return Expression{
                             .literal = Literal{
                                 .number = left.literal.number / right.literal.number,
+                            },
+                        };
+                    },
+                    .Modulo => {
+                        if (right.literal.number == 0) {
+                            return error.DivisionByZero;
+                        }
+                        return Expression{
+                            .literal = Literal{
+                                .number = @mod(left.literal.number, right.literal.number),
                             },
                         };
                     },
