@@ -44,44 +44,53 @@
   <script src="/prism/prism.js" defer></script>
 </svelte:head>
 
-<div class="flex flex-row min-h-screen bg-mantle">
-  <div class="flex flex-col gap-4 flex-1">
+<div class="flex flex-row min-h-screen">
+  <div class="flex flex-col gap-4 flex-1 bg-mantle shadow-2xl">
     <div class="p-4 prose prose-awesome font-sans min-w-full flex-1">
       {@html content}
     </div>
     <div
-      class="w-full h-30 grid grid-cols-2 grid-rows-1 p-2 gap-2 *:rounded-lg *:text-center *:leading-26"
+      class="w-full h-30 max-h-30 grid grid-cols-2 grid-rows-1 p-2 gap-2 *:rounded-lg *:text-center"
     >
       {#if data.prev?.name}
         <button
           onclick={() =>
             (window.location.href = `/docs/${data.prev?.location}`)}
-          class="underline text-base font-bold cursor-pointer"
+          class="text-base font-bold cursor-pointer max-h-30 overflow-hidden"
         >
-          <div class="bg-green rounded-lg">
-            &#8592; Previous: {data.prev?.name}
+          <div
+            class="bg-blue rounded-lg flex flex-col justify-center items-start gap-0 h-30 p-4"
+          >
+            <h1 class="h-fit text-xl">&#8592; Previous</h1>
+            <span class="text-surface1">
+              {data.prev?.name}
+            </span>
           </div>
         </button>
       {:else}
-        <div class="bg-surface2">No previous page</div>
+        <div class="bg-surface2 leading-26">No previous page</div>
       {/if}
       {#if data.next?.name}
         <button
           onclick={() =>
             (window.location.href = `/docs/${data.next?.location}`)}
-          class="underline text-base font-bold cursor-pointer"
+          class="text-base font-bold cursor-pointer max-h-30 overflow-hidden"
         >
-          <div class="bg-green rounded-lg">
-            Next: {data.next?.name}
-            &#8594;
+          <div
+            class="bg-green rounded-lg flex flex-col justify-center items-end gap-0 h-30 p-4"
+          >
+            <h1 class="h-fit text-xl">Next &#8594;</h1>
+            <span class="text-surface1">
+              {data.next?.name}
+            </span>
           </div>
         </button>
       {:else}
-        <div class="bg-surface2">No next page</div>
+        <div class="bg-surface2 leading-26">No next page</div>
       {/if}
     </div>
   </div>
-  <div class="bg-base w-1/3 min-h-full">
+  <div class="w-1/3 min-h-full">
     <div class="sticky top-0">
       {#each headings as heading}
         <div class="p-2">

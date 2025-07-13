@@ -5,7 +5,7 @@
 </script>
 
 <div class="min-h-screen min-w-screen max-w-screen flex flex-row">
-  <div class="flex-1 bg-base p-4 box-border shadow-2xl">
+  <div class="flex-1 p-4 box-border">
     <div class="sticky top-2 flex flex-col gap-2 justify-center">
       <h1 class="font-bold text-2xl">Contents</h1>
       <hr />

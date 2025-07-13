@@ -2,6 +2,29 @@
   import "../app.css";
 
   let { children } = $props();
+  import { onMount } from "svelte";
+
+  onMount(() => {
+    const canvas = document.createElement("canvas");
+    const size = 400;
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+
+    const imageData = ctx.createImageData(size, size);
+    const data = imageData.data;
+
+    for (let i = 0; i < data.length; i += 4) {
+      const shade = Math.floor(Math.random() * 256);
+      data[i] = shade;
+      data[i + 1] = shade;
+      data[i + 2] = shade;
+      data[i + 3] = 10;
+    }
+
+    ctx.putImageData(imageData, 0, 0);
+    document.body.style.backgroundImage = `url(${canvas.toDataURL()})`;
+  });
 </script>
 
 <svelte:head>
@@ -27,7 +50,7 @@
   <button onclick={() => (window.location.href = "/ide")}>IDE</button>
 </div>
 <div
-  class="min-h-screen min-w-screen max-w-screen bg-base text-text flex flex-col"
+  class="min-h-screen min-w-screen max-w-screen text-text flex flex-col"
 >
   <div class="flex-1">
     {@render children()}
@@ -46,6 +69,11 @@
       Inspired by <a href="https://github.com/cyteon/modu" class="text-blue"
         >Modu</a
       >
+    </div>
+    <div>
+      &#9733; on <a href="https://github.com/tathyagarg/intoxicode"
+        class="text-blue"
+        >GitHub</a>
     </div>
   </div>
 </div>
