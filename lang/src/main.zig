@@ -59,7 +59,7 @@ pub fn main() !void {
 
     try lexer.scan_tokens();
 
-    var parser = Parser.init(lexer.tokens, allocator);
+    var parser = try Parser.init(lexer.tokens, allocator);
     const statements = try parser.parse();
 
     const runner = try Runner.init(allocator, stdout.any(), stderr.any(), statements.items);

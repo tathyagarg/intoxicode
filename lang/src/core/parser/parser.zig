@@ -16,11 +16,17 @@ pub const Parser = struct {
 
     allocator: std.mem.Allocator,
 
-    pub fn init(tokens: std.ArrayList(Token), allocator: std.mem.Allocator) Parser {
+    certainty_mods: *bool,
+
+    pub fn init(tokens: std.ArrayList(Token), allocator: std.mem.Allocator) !Parser {
+        const certainty_mods = try allocator.create(bool);
+        certainty_mods.* = true;
+
         return Parser{
             .tokens = tokens,
             .current = 0,
             .allocator = allocator,
+            .certainty_mods = certainty_mods,
         };
     }
 
@@ -97,18 +103,20 @@ pub const Parser = struct {
         else
             try self.expression_statement();
 
-        const next = self.advance();
-        const certainty: f32 = switch (next.token_type) {
-            .Period => 1.0,
-            .QuestionMark => 0.75,
-            else => std.debug.panic("Unexpected token after statement: {s} in statement: {s}\n-> {s}", .{
-                next.value,
-                @tagName(found_stmt.*),
-                try found_stmt.pretty_print(self.allocator),
-            }),
-        };
+        if (self.certainty_mods.*) {
+            const next = self.advance();
+            const certainty: f32 = switch (next.token_type) {
+                .Period => 1.0,
+                .QuestionMark => 0.75,
+                else => std.debug.panic("Unexpected token after statement: {s} in statement: {s}\n-> {s}", .{
+                    next.value,
+                    @tagName(found_stmt.*),
+                    try found_stmt.pretty_print(self.allocator),
+                }),
+            };
 
-        found_stmt.set_certainty(certainty);
+            found_stmt.set_certainty(certainty);
+        }
 
         return found_stmt;
     }
@@ -116,6 +124,11 @@ pub const Parser = struct {
     fn directive(self: *Parser) !*Statement {
         const feature = try self.consume(.Identifier, "Expected feature name after '@'");
         const stmt = try self.allocator.create(Statement);
+
+        if (std.mem.eql(u8, feature.value, "uncertainty") or std.mem.eql(u8, feature.value, "all")) {
+            self.certainty_mods.* = false;
+        }
+
         stmt.* = Statement{
             .directive = statements.Directive{
                 .name = feature.value,
