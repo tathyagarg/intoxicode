@@ -50,4 +50,23 @@ The `to_string` function converts a value to a string. It can take any data type
 scream(to_string(42)).
 ```
 
+## `to_number`
+The `to_number` function converts a string to a number. It can take a string as an argument and will return its numeric representation. If the string cannot be converted to a number, it will return `null`.
+```intox
+scream(to_number("42")).
+```
+
+## `is_digit`
+The `is_digit` function checks if a string contains only digits. It takes a single string argument and returns `true` if the string contains only digits, otherwise it returns `false`.
+```intox
+scream(is_digit("12345")).
+scream(is_digit("123a45")).
+```
+
+## `chr`
+The `chr` function converts an ASCII code to its corresponding character. It takes a single integer argument representing the ASCII code and returns the character as a string.
+```intox
+scream(chr(65)).  # Outputs "A"
+```
+
 More functions may be added in the future, and they will be documented here.
