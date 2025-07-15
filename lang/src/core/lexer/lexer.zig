@@ -22,6 +22,8 @@ pub const Keywords = [_]Pair{
     .{ .key = "null", .value = .Null },
     .{ .key = "true", .value = .Boolean },
     .{ .key = "false", .value = .Boolean },
+    .{ .key = "to", .value = .To },
+    .{ .key = "repeat", .value = .Repeat },
 };
 
 pub fn is_keyword(token: []const u8) bool {

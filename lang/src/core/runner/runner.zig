@@ -55,6 +55,9 @@ pub const Runner = struct {
         std_functions.putNoClobber("sqrt", stdlib.sqrt) catch unreachable;
         std_functions.putNoClobber("length", stdlib.length) catch unreachable;
         std_functions.putNoClobber("to_string", stdlib.to_string) catch unreachable;
+        std_functions.putNoClobber("to_number", stdlib.to_number) catch unreachable;
+        std_functions.putNoClobber("is_digit", stdlib.is_digit) catch unreachable;
+        std_functions.putNoClobber("chr", stdlib.chr) catch unreachable;
 
         const certain_count = try allocator.create(usize);
         certain_count.* = 0;
@@ -171,6 +174,32 @@ pub const Runner = struct {
                             } else {
                                 try self.stderr.print("Unknown directive: {s}\n", .{target});
                                 std.process.exit(1);
+                            }
+                        },
+                        .repeat_statement => |repeat_stmt| {
+                            const name = repeat_stmt.variable;
+
+                            const count = try self.evaluate_expression(repeat_stmt.count, variables);
+                            if (count.literal != .number) {
+                                try self.stderr.print("Repeat count must be a number, got: {s}\n", .{try count.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            }
+
+                            const repeat_count = @as(usize, @intFromFloat(count.literal.number));
+                            if (repeat_count == 0) {
+                                continue;
+                            }
+
+                            for (0..repeat_count) |i| {
+                                try variables.put(name, Expression{
+                                    .literal = Literal{
+                                        .number = @floatFromInt(i),
+                                    },
+                                });
+
+                                if (try self.run_snippet(repeat_stmt.body.items, variables)) |result| {
+                                    return result;
+                                }
                             }
                         },
                         // else => {},
@@ -324,7 +353,7 @@ pub const Runner = struct {
                     else => {
                         try self.stderr.print("Invalid binary operator: {}\n", .{binary.operator.token_type});
                         std.process.exit(1);
-                    }
+                    },
                 };
             },
             .grouping => |group| {
@@ -372,7 +401,7 @@ pub const Runner = struct {
             else => {
                 try self.stderr.print("Invalid function call: {s}\n", .{try callee.literal.to_string(self.allocator, self)});
                 std.process.exit(1);
-            }
+            },
         }
     }
 
@@ -395,7 +424,6 @@ pub const Runner = struct {
             try local_vars.put(func_decl.parameters.items[i], args[i]);
         }
 
-        // Run the function body
         if (try self.run_snippet(func_decl.body.items, &local_vars)) |result|
             return result;
 

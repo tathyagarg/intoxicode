@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Play, Download, Upload } from "lucide-svelte";
   import { basicSetup, EditorView } from "codemirror";
+  import { keymap } from "@codemirror/view";
+  import { indentWithTab } from "@codemirror/commands";
   import { EditorState, Compartment } from "@codemirror/state";
 
   import { browser } from "$app/environment";
@@ -13,11 +15,12 @@
     extensions: [
       basicSetup,
       tabsize.of(EditorState.tabSize.of(4)),
+      keymap.of([indentWithTab]),
       EditorView.theme(
         {
           "&": {
             color: "var(--color-text)",
-            backgroundColor: "#11111b",
+            backgroundColor: "var(--color-crust)",
             fontSize: "24px",
             height: "100%",
           },
@@ -27,15 +30,27 @@
           },
 
           ".cm-activeLine": {
-            backgroundColor: "var(--color-surface0)",
+            backgroundColor: "rgba(from var(--color-surface0) r g b / 0.50)",
           },
+
+          "&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, .cm-content ::selection":
+            { backgroundColor: "rgba(from var(--color-green) r g b / 0.25)" },
 
           ".cm-activeLineGutter": {
             backgroundColor: "var(--color-base)",
           },
 
           ".cm-gutters": {
+            color: "var(--color-text)",
             backgroundColor: "var(--color-crust)",
+            borderRight: "1px solid var(--color-surface0)",
+          },
+          ".cm-selectionBackground": {
+            backgroundColor: "var(--color-surface1)",
+          },
+
+          ".cm-editor ::selection": {
+            backgroundColor: "var(--color-surface1)",
           },
         },
         { dark: true },
@@ -49,12 +64,11 @@
     if (browser) {
       view = new EditorView({
         state,
-        parent: document.querySelector("#code"),
+        parent: document.querySelector("#code") || document.body,
       });
     }
   });
 
-  let output = "Run the code to see the output";
   let stdout = "stdout";
   let stderr = "stderr";
   let runClicked = false;
@@ -62,7 +76,6 @@
   async function run() {
     try {
       runClicked = true;
-      output = "Running...";
 
       const res = await fetch("/api/eval", {
         method: "POST",
@@ -140,14 +153,18 @@
     </div>
 
     <div class="flex flex-col gap-4 w-1/3">
-      <div class="bg-mantle w-full p-6 pt-4 h-full rounded-md flex flex-col">
+      <div
+        class="bg-mantle w-full p-6 pt-4 h-full max-h-1/2 rounded-md flex flex-col flex-1"
+      >
         <h1 class="text-3xl font-bold">
           <code class="text-green">stdout</code>
         </h1>
         <pre
-          class="p-4 mt-4 text-xl break-words whitespace-pre-wrap bg-crust h-full rounded-md">{stdout}</pre>
+          class="p-4 mt-4 text-xl break-words whitespace-pre-wrap bg-crust h-full max-h-full overflow-y-scroll rounded-md">{stdout}</pre>
       </div>
-      <div class="bg-mantle w-full p-6 pt-4 h-full rounded-md flex flex-col">
+      <div
+        class="bg-mantle w-full p-6 pt-4 h-full max-h-1/2 rounded-md flex flex-col flex-1"
+      >
         <h1 class="text-3xl font-bold"><code class="text-red">stderr</code></h1>
         <pre
           class="p-4 mt-4 text-xl break-words whitespace-pre-wrap bg-crust h-full rounded-md">{stderr}</pre>

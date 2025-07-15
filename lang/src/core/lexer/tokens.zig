@@ -39,6 +39,8 @@ pub const TokenType = enum {
     Else,
 
     Loop,
+    Repeat,
+    To,
 
     Fun,
     Throwaway, // return

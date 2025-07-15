@@ -25,10 +25,18 @@ if condition1 {
 Again, note the use of a certainty modifier at the end of the `else` blocks.
 
 ## Loops
-Loops allow you to repeat a block of code multiple times. There is one type of loop in Intoxicode: the `loop`. It's analogous to the `while` loop in other languages.
+Loops allow you to repeat a block of code multiple times. There are 2 types of loops in Intoxicode: `loop` loops (analogous to `while` loops in other languages) and `repeat` loops (somewhat like `for` loops in other languages).
 
+### `loop` Loops
 ```intox
 loop condition {
+  ...
+}.
+```
+
+### `repeat` Loops
+```intox
+repeat variable_name to count {
   ...
 }.
 ```

@@ -11,6 +11,7 @@ pub const Statement = union(enum) {
     try_statement: TryStatement,
     throwaway_statement: ThrowawayStatement,
     directive: Directive,
+    repeat_statement: RepeatStatement,
 
     pub fn get_certainty(self: Statement) !f32 {
         return switch (self) {
@@ -22,6 +23,7 @@ pub const Statement = union(enum) {
             .try_statement => self.try_statement.certainty,
             .throwaway_statement => self.throwaway_statement.certainty,
             .directive => 1.0,
+            .repeat_statement => self.repeat_statement.certainty,
         };
     }
 
@@ -35,6 +37,7 @@ pub const Statement = union(enum) {
             .try_statement => |*t| t.certainty = certainty,
             .throwaway_statement => |*t| t.certainty = certainty,
             .directive => {},
+            .repeat_statement => |*r| r.certainty = certainty,
         }
     }
 
@@ -60,6 +63,7 @@ pub const Statement = union(enum) {
             .loop_statement => |l| l.pretty_print(allocator),
             .try_statement => |t| t.pretty_print(allocator),
             .directive => |d| d.pretty_print(allocator),
+            .repeat_statement => |r| r.pretty_print(allocator),
         };
     }
 };
@@ -223,5 +227,35 @@ pub const Directive = struct {
         try builder.appendSlice(self.name);
 
         return try builder.toOwnedSlice();
+    }
+};
+
+pub const RepeatStatement = struct {
+    body: std.ArrayList(*Statement),
+    count: Expression,
+    variable: []const u8,
+
+    certainty: f32 = 1.0,
+
+    pub fn pretty_print(self: RepeatStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
+        var builder = std.ArrayList(u8).init(allocator);
+        defer builder.deinit();
+
+        try builder.appendSlice("repeat ");
+        try builder.appendSlice(self.variable);
+        try builder.appendSlice(" = 0 to ");
+        try builder.appendSlice(try self.count.pretty_print(allocator));
+        try builder.appendSlice(" {\n");
+
+        for (self.body.items) |s| {
+            try builder.appendSlice("    ");
+            try builder.appendSlice(try s.pretty_print(allocator));
+            try builder.appendSlice("\n");
+        }
+
+        try builder.appendSlice("}\n");
+
+        const result = try builder.toOwnedSlice();
+        return result;
     }
 };

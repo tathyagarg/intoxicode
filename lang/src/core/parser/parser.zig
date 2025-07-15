@@ -100,6 +100,8 @@ pub const Parser = struct {
             try self.assignment_or_expression()
         else if (self.match(&[_]TokenType{.Directive}))
             try self.directive()
+        else if (self.match(&[_]TokenType{.Repeat}))
+            try self.repeat()
         else
             try self.expression_statement();
 
@@ -119,6 +121,36 @@ pub const Parser = struct {
         }
 
         return found_stmt;
+    }
+
+    fn repeat(self: *Parser) !*Statement {
+        const var_name = try self.consume(.Identifier, "Expected variable name after 'repeat' keyword.");
+
+        _ = try self.consume(.To, "Expected 'to' keyword after repeat condition.");
+
+        const count = try self.expression();
+
+        _ = try self.consume(.LeftBrace, "Expected '{' to start repeat block.");
+
+        var body = std.ArrayList(*Statement).init(self.allocator);
+
+        while (!self.is_at_end() and !self.check(.RightBrace)) {
+            const stmt = try self.statement();
+            try body.append(stmt);
+        }
+
+        _ = try self.consume(.RightBrace, "Expected '}' to end repeat block.");
+
+        const stmt = try self.allocator.create(Statement);
+        stmt.* = Statement{
+            .repeat_statement = statements.RepeatStatement{
+                .variable = var_name.value,
+                .count = count,
+                .body = body,
+            },
+        };
+
+        return stmt;
     }
 
     fn directive(self: *Parser) !*Statement {
@@ -356,40 +388,31 @@ pub const Parser = struct {
     }
 
     fn expression(self: *Parser) error{ OutOfMemory, InvalidCharacter }!Expression {
-        if (self.match(&[_]TokenType{.LeftParen})) {
-            const expr = try self.allocator.create(Expression);
-            expr.* = try self.expression();
+        return try self.logical();
+    }
 
-            _ = try self.consume(.RightParen, "Expected ')' after expression.");
+    fn logical(self: *Parser) !Expression {
+        var expr = try self.equality();
 
-            return Expression{
-                .grouping = expressions.Grouping{
-                    .expression = expr,
+        while (self.match(&[_]TokenType{ .And, .Or })) {
+            const operator = self.previous();
+
+            const right = try self.allocator.create(Expression);
+            right.* = try self.equality();
+
+            const left = try self.allocator.create(Expression);
+            left.* = expr;
+
+            expr = Expression{
+                .binary = expressions.Binary{
+                    .left = left,
+                    .operator = operator,
+                    .right = right,
                 },
             };
         }
 
-        if (self.match(&[_]TokenType{.LeftBracket})) {
-            const elements = try self.allocator.create(std.ArrayList(Expression));
-            elements.* = std.ArrayList(Expression).init(self.allocator);
-
-            while (!self.is_at_end() and !self.check(.RightBracket)) {
-                const element = try self.expression();
-                try elements.append(element);
-
-                if (!self.match(&[_]TokenType{.Comma})) break;
-            }
-
-            _ = try self.consume(.RightBracket, "Expected ']' after array elements.");
-
-            return Expression{
-                .literal = expressions.Literal{
-                    .array = elements.*,
-                },
-            };
-        }
-
-        return try self.equality();
+        return expr;
     }
 
     fn equality(self: *Parser) !Expression {
@@ -544,6 +567,39 @@ pub const Parser = struct {
     }
 
     fn primary(self: *Parser) !Expression {
+        if (self.match(&[_]TokenType{.LeftParen})) {
+            const expr = try self.allocator.create(Expression);
+            expr.* = try self.expression();
+
+            _ = try self.consume(.RightParen, "Expected ')' after expression.");
+
+            return Expression{
+                .grouping = expressions.Grouping{
+                    .expression = expr,
+                },
+            };
+        }
+
+        if (self.match(&[_]TokenType{.LeftBracket})) {
+            const elements = try self.allocator.create(std.ArrayList(Expression));
+            elements.* = std.ArrayList(Expression).init(self.allocator);
+
+            while (!self.is_at_end() and !self.check(.RightBracket)) {
+                const element = try self.expression();
+                try elements.append(element);
+
+                if (!self.match(&[_]TokenType{.Comma})) break;
+            }
+
+            _ = try self.consume(.RightBracket, "Expected ']' after array elements.");
+
+            return Expression{
+                .literal = expressions.Literal{
+                    .array = elements.*,
+                },
+            };
+        }
+
         if (self.match(&[_]TokenType{ .Integer, .Float, .String, .Identifier, .Boolean, .Null })) {
             const token = self.previous();
 
@@ -553,7 +609,9 @@ pub const Parser = struct {
                         .name = token.value,
                     },
                 },
-                .Integer, .Float => Expression{ .literal = try expressions.Literal.number_from_string(token.value) },
+                .Integer, .Float => Expression{
+                    .literal = try expressions.Literal.number_from_string(token.value),
+                },
                 .String => Expression{
                     .literal = expressions.Literal{
                         .string = token.value,
