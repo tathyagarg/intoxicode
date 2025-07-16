@@ -15,7 +15,9 @@
     const data = imageData.data;
 
     for (let i = 0; i < data.length; i += 4) {
-      const shade = Math.floor(Math.random() * 256);
+      const shade_range = Math.random();
+      const shade = (shade_range > 0.5 ? 255 : 0) * Math.random() * 0.75;
+
       data[i] = shade;
       data[i + 1] = shade;
       data[i + 2] = shade;
@@ -49,9 +51,7 @@
   <a href="/docs">Docs</a>
   <button onclick={() => (window.location.href = "/ide")}>IDE</button>
 </div>
-<div
-  class="min-h-screen min-w-screen max-w-screen text-text flex flex-col"
->
+<div class="min-h-screen min-w-screen max-w-screen text-text flex flex-col">
   <div class="flex-1">
     {@render children()}
   </div>
@@ -71,9 +71,10 @@
       >
     </div>
     <div>
-      &#9733; on <a href="https://github.com/tathyagarg/intoxicode"
-        class="text-blue"
-        >GitHub</a>
+      &#9733; on <a
+        href="https://github.com/tathyagarg/intoxicode"
+        class="text-blue">GitHub</a
+      >
     </div>
   </div>
 </div>
