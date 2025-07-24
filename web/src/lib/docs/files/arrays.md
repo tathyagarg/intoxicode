@@ -15,4 +15,29 @@ scream(array[0]).
 ```
 
 ## Modifying Elements
-Nuh uh.
+You can use the built-in `update` function to modify elements in an array. The `update` function takes the array, the index of the element to modify, and the new value.
+
+```intox
+array = [1, "Hello", 3.14, true].
+update(array, 1, "World").
+scream(array[1]).
+```
+
+## Adding Elements
+To add elements to an array, you can use the `append` function. This function takes the array and the value to add.
+
+```intox
+array = [1, "Hello", 3.14, true].
+append(array, "New Element").
+scream(array[4]).
+```
+
+## Removing Elements
+To remove elements from an array, you can use the `remove` function. This function takes the array and the index of the element to remove.
+
+```intox
+array = [1, "Hello", 3.14, true].
+remove(array, 2).
+scream(array[2]).  # This will now print 'true' since the element at index 2 was removed.
+```
+

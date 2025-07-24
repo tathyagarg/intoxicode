@@ -4,7 +4,7 @@ const Runner = @import("runner.zig").Runner;
 const Expression = @import("../parser/parser.zig").expressions.Expression;
 const Literal = @import("../parser/parser.zig").expressions.Literal;
 
-pub fn scream(self: Runner, args: []Expression) anyerror!Expression {
+pub fn scream(self: Runner, args: []*Expression) anyerror!Expression {
     var output = std.ArrayList(u8).init(self.allocator);
     for (args) |arg| {
         try output.appendSlice(try arg.literal.to_string(self.allocator, self));
@@ -18,7 +18,7 @@ pub fn scream(self: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn abs(r: Runner, args: []Expression) anyerror!Expression {
+pub fn abs(r: Runner, args: []*Expression) anyerror!Expression {
     if (args.len != 1) {
         try r.stderr.print("abs() requires exactly one argument, got {}\n", .{args.len});
         std.process.exit(1);
@@ -32,11 +32,11 @@ pub fn abs(r: Runner, args: []Expression) anyerror!Expression {
             },
         };
     } else {
-        return arg;
+        return arg.*;
     }
 }
 
-pub fn min(r: Runner, args: []Expression) anyerror!Expression {
+pub fn min(r: Runner, args: []*Expression) anyerror!Expression {
     if (args.len == 0) {
         try r.stderr.print("min() requires at least one argument, got {}\n", .{args.len});
         std.process.exit(1);
@@ -56,7 +56,7 @@ pub fn min(r: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn max(r: Runner, args: []Expression) anyerror!Expression {
+pub fn max(r: Runner, args: []*Expression) anyerror!Expression {
     if (args.len == 0) {
         try r.stderr.print("max() requires at least one argument, got {}\n", .{args.len});
         std.process.exit(1);
@@ -76,7 +76,7 @@ pub fn max(r: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn pow(r: Runner, args: []Expression) anyerror!Expression {
+pub fn pow(r: Runner, args: []*Expression) anyerror!Expression {
     if (args.len != 2) {
         try r.stderr.print("pow() requires exactly two arguments, got {}\n", .{args.len});
         std.process.exit(1);
@@ -92,7 +92,7 @@ pub fn pow(r: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn sqrt(r: Runner, args: []Expression) anyerror!Expression {
+pub fn sqrt(r: Runner, args: []*Expression) anyerror!Expression {
     if (args.len != 1) {
         try r.stderr.print("sqrt() requires exactly one argument, got {}\n", .{args.len});
         std.process.exit(1);
@@ -111,7 +111,7 @@ pub fn sqrt(r: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn length(r: Runner, args: []Expression) anyerror!Expression {
+pub fn length(r: Runner, args: []*Expression) anyerror!Expression {
     if (args.len != 1) {
         try r.stderr.print("length() requires exactly one argument, got {}\n", .{args.len});
         std.process.exit(1);
@@ -133,7 +133,7 @@ pub fn length(r: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn to_string(self: Runner, args: []Expression) anyerror!Expression {
+pub fn to_string(self: Runner, args: []*Expression) anyerror!Expression {
     if (args.len != 1) {
         try self.stderr.print("to_string() requires exactly one argument, got {}\n", .{args.len});
         std.process.exit(1);
@@ -147,7 +147,7 @@ pub fn to_string(self: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn to_number(self: Runner, args: []Expression) anyerror!Expression {
+pub fn to_number(self: Runner, args: []*Expression) anyerror!Expression {
     if (args.len != 1) {
         try self.stderr.print("to_number() requires exactly one argument, got {}\n", .{args.len});
         std.process.exit(1);
@@ -190,7 +190,7 @@ pub fn to_number(self: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn is_digit(self: Runner, args: []Expression) anyerror!Expression {
+pub fn is_digit(self: Runner, args: []*Expression) anyerror!Expression {
     if (args.len != 1) {
         try self.stderr.print("is_digit() requires exactly one argument, got {}\n", .{args.len});
         std.process.exit(1);
@@ -220,7 +220,7 @@ pub fn is_digit(self: Runner, args: []Expression) anyerror!Expression {
     };
 }
 
-pub fn chr(self: Runner, args: []Expression) anyerror!Expression {
+pub fn chr(self: Runner, args: []*Expression) anyerror!Expression {
     if (args.len != 1) {
         try self.stderr.print("chr() requires exactly one argument, got {}\n", .{args.len});
         std.process.exit(1);
@@ -244,6 +244,226 @@ pub fn chr(self: Runner, args: []Expression) anyerror!Expression {
     return Expression{
         .literal = Literal{
             .string = buffer,
+        },
+    };
+}
+
+pub fn append(self: Runner, args: []*Expression) anyerror!Expression {
+    if (args.len != 2) {
+        try self.stderr.print("append() requires exactly two arguments, got {}\n", .{args.len});
+        std.process.exit(1);
+    }
+
+    const array_expr = args[0];
+    const value_expr = args[1];
+
+    if (array_expr.literal != .array) {
+        try self.stderr.print("append() first argument must be an array, got {}\n", .{array_expr.literal});
+        std.process.exit(1);
+    }
+
+    var array = array_expr.literal.array;
+    const value = value_expr;
+
+    array.append(value.*) catch |err| {
+        try self.stderr.print("append() failed to append value: {}\n", .{err});
+        std.process.exit(1);
+    };
+
+    array_expr.literal.array = array;
+
+    return Expression{
+        .literal = Literal{
+            .null = null,
+        },
+    };
+}
+
+pub fn insert(self: Runner, args: []*Expression) anyerror!Expression {
+    if (args.len != 3) {
+        try self.stderr.print("insert() requires exactly three arguments, got {}\n", .{args.len});
+        std.process.exit(1);
+    }
+
+    const array_expr = args[0];
+    const index_expr = args[1];
+    const value_expr = args[2];
+
+    if (array_expr.literal != .array) {
+        try self.stderr.print("insert() first argument must be an array, got {}\n", .{array_expr.literal});
+        std.process.exit(1);
+    }
+
+    if (index_expr.literal != .number) {
+        try self.stderr.print("insert() second argument must be a number, got {}\n", .{index_expr.literal});
+        std.process.exit(1);
+    }
+
+    var array = array_expr.literal.array;
+    const index: usize = @intFromFloat(index_expr.literal.number);
+    const value = value_expr;
+
+    if (index < 0 or index > array.items.len) {
+        try self.stderr.print("insert() index out of bounds: {}\n", .{index});
+        std.process.exit(1);
+    }
+
+    array.insert(index, value.*) catch |err| {
+        try self.stderr.print("insert() failed to insert value: {}\n", .{err});
+        std.process.exit(1);
+    };
+
+    array_expr.literal.array = array;
+
+    return Expression{
+        .literal = Literal{
+            .null = null,
+        },
+    };
+}
+
+pub fn remove(self: Runner, args: []*Expression) anyerror!Expression {
+    if (args.len != 2) {
+        try self.stderr.print("remove() requires exactly two arguments, got {}\n", .{args.len});
+        std.process.exit(1);
+    }
+
+    const array_expr = args[0];
+    const index_expr = args[1];
+
+    if (array_expr.literal != .array) {
+        try self.stderr.print("remove() first argument must be an array, got {}\n", .{array_expr.literal});
+        std.process.exit(1);
+    }
+
+    if (index_expr.literal != .number) {
+        try self.stderr.print("remove() second argument must be a number, got {}\n", .{index_expr.literal});
+        std.process.exit(1);
+    }
+
+    var array = array_expr.literal.array;
+    const index: usize = @intFromFloat(index_expr.literal.number);
+
+    if (index < 0 or index >= array.items.len) {
+        try self.stderr.print("remove() index out of bounds: {}\n", .{index});
+        std.process.exit(1);
+    }
+
+    _ = array.orderedRemove(index);
+
+    array_expr.literal.array = array;
+
+    return Expression{
+        .literal = Literal{
+            .null = null,
+        },
+    };
+}
+
+pub fn find_first(self: Runner, args: []*Expression) anyerror!Expression {
+    if (args.len != 2) {
+        try self.stderr.print("findFirst() requires exactly two arguments, got {}\n", .{args.len});
+        std.process.exit(1);
+    }
+
+    const array_expr = args[0];
+    const value_expr = args[1];
+
+    if (array_expr.literal != .array) {
+        try self.stderr.print("findFirst() first argument must be an array, got {}\n", .{array_expr.literal});
+        std.process.exit(1);
+    }
+
+    const array = array_expr.literal.array;
+    const value = value_expr;
+
+    for (array.items, 0..) |item, index| {
+        if (try value.equals(item, self)) {
+            return Expression{
+                .literal = Literal{
+                    .number = @floatFromInt(index),
+                },
+            };
+        }
+    }
+
+    return Expression{
+        .literal = Literal{
+            .number = -1.0,
+        },
+    };
+}
+
+pub fn find_last(self: Runner, args: []*Expression) anyerror!Expression {
+    if (args.len != 2) {
+        try self.stderr.print("findLast() requires exactly two arguments, got {}\n", .{args.len});
+        std.process.exit(1);
+    }
+
+    const array_expr = args[0];
+    const value_expr = args[1];
+
+    if (array_expr.literal != .array) {
+        try self.stderr.print("findLast() first argument must be an array, got {}\n", .{array_expr.literal});
+        std.process.exit(1);
+    }
+
+    const array = array_expr.literal.array;
+    const value = value_expr;
+
+    for (array.items, (array.items.len - 1)..) |item, index| {
+        if (try value.equals(item, self)) {
+            return Expression{
+                .literal = Literal{
+                    .number = @floatFromInt(index),
+                },
+            };
+        }
+    }
+
+    return Expression{
+        .literal = Literal{
+            .number = -1.0,
+        },
+    };
+}
+
+pub fn update(self: Runner, args: []*Expression) anyerror!Expression {
+    if (args.len != 3) {
+        try self.stderr.print("update() requires exactly three arguments, got {}\n", .{args.len});
+        std.process.exit(1);
+    }
+
+    const array_expr = args[0];
+    const index_expr = args[1];
+    const value_expr = args[2];
+
+    if (array_expr.literal != .array) {
+        try self.stderr.print("update() first argument must be an array, got {}\n", .{array_expr.literal});
+        std.process.exit(1);
+    }
+
+    if (index_expr.literal != .number) {
+        try self.stderr.print("update() second argument must be a number, got {}\n", .{index_expr.literal});
+        std.process.exit(1);
+    }
+
+    var array = array_expr.literal.array;
+    const index: usize = @intFromFloat(index_expr.literal.number);
+    const value = value_expr;
+
+    if (index < 0 or index >= array.items.len) {
+        try self.stderr.print("update() index out of bounds: {}\n", .{index});
+        std.process.exit(1);
+    }
+
+    array.items[index] = value.*;
+
+    array_expr.literal.array = array;
+
+    return Expression{
+        .literal = Literal{
+            .null = null,
         },
     };
 }

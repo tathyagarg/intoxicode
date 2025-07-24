@@ -6,7 +6,7 @@ const Literal = @import("../parser/parser.zig").expressions.Literal;
 const Identifier = @import("../parser/parser.zig").expressions.Identifier;
 const Call = @import("../parser/parser.zig").expressions.Call;
 
-const StdFunction = *const fn (Runner, []Expression) anyerror!Expression;
+const StdFunction = *const fn (Runner, []*Expression) anyerror!Expression;
 
 const stdlib = @import("stdlib.zig");
 
@@ -23,7 +23,7 @@ pub const Runner = struct {
     stdout: std.io.AnyWriter,
     stderr: std.io.AnyWriter,
 
-    variables: *std.StringHashMap(Expression),
+    variables: *std.StringHashMap(*Expression),
     functions: *std.StringHashMap(Statement),
     statements: []*Statement,
 
@@ -40,8 +40,8 @@ pub const Runner = struct {
         stderr: std.io.AnyWriter,
         statements: []*Statement,
     ) !Runner {
-        const variables = try allocator.create(std.StringHashMap(Expression));
-        variables.* = std.StringHashMap(Expression).init(allocator);
+        const variables = try allocator.create(std.StringHashMap(*Expression));
+        variables.* = std.StringHashMap(*Expression).init(allocator);
 
         const functions = try allocator.create(std.StringHashMap(Statement));
         functions.* = std.StringHashMap(Statement).init(allocator);
@@ -58,6 +58,12 @@ pub const Runner = struct {
         std_functions.putNoClobber("to_number", stdlib.to_number) catch unreachable;
         std_functions.putNoClobber("is_digit", stdlib.is_digit) catch unreachable;
         std_functions.putNoClobber("chr", stdlib.chr) catch unreachable;
+        std_functions.putNoClobber("append", stdlib.append) catch unreachable;
+        std_functions.putNoClobber("insert", stdlib.insert) catch unreachable;
+        std_functions.putNoClobber("remove", stdlib.remove) catch unreachable;
+        std_functions.putNoClobber("find_first", stdlib.find_first) catch unreachable;
+        std_functions.putNoClobber("find_last", stdlib.find_last) catch unreachable;
+        std_functions.putNoClobber("update", stdlib.update) catch unreachable;
 
         const certain_count = try allocator.create(usize);
         certain_count.* = 0;
@@ -103,7 +109,7 @@ pub const Runner = struct {
         return certainty;
     }
 
-    fn run_snippet(self: Runner, statements: []*Statement, variables: *std.StringHashMap(Expression)) !?Expression {
+    fn run_snippet(self: Runner, statements: []*Statement, variables: *std.StringHashMap(*Expression)) !?Expression {
         for (statements) |statement| {
             const certainty = try self.calculate_certainty(statement.*);
             const roll = std.crypto.random.float(f32);
@@ -118,9 +124,14 @@ pub const Runner = struct {
                     switch (statement.*) {
                         .assignment => |assignment| {
                             const key = assignment.identifier;
-                            const value = try self.evaluate_expression(assignment.expression, variables);
+                            const value = try self.allocator.create(Expression);
+                            value.* = try self.evaluate_expression(assignment.expression, variables);
 
-                            try variables.put(key, value);
+                            if (variables.getPtr(key)) |existing| {
+                                existing.*.* = value.*;
+                            } else {
+                                try variables.put(key, value);
+                            }
                         },
                         .expression => |expr| {
                             _ = try self.evaluate_expression(expr, variables);
@@ -190,12 +201,21 @@ pub const Runner = struct {
                                 continue;
                             }
 
+                            const name_expr = try self.allocator.create(Expression);
+                            name_expr.* = Expression{
+                                .literal = Literal{
+                                    .number = @floatFromInt(0),
+                                },
+                            };
+
                             for (0..repeat_count) |i| {
-                                try variables.put(name, Expression{
-                                    .literal = Literal{
-                                        .number = @floatFromInt(i),
-                                    },
-                                });
+                                if (variables.getPtr(name)) |existing| {
+                                    existing.*.* = Expression{
+                                        .literal = Literal{
+                                            .number = @floatFromInt(i),
+                                        },
+                                    };
+                                }
 
                                 if (try self.run_snippet(repeat_stmt.body.items, variables)) |result| {
                                     return result;
@@ -213,7 +233,7 @@ pub const Runner = struct {
     pub fn evaluate_expression(
         self: Runner,
         expr: Expression,
-        variables: *std.StringHashMap(Expression),
+        variables: *std.StringHashMap(*Expression),
     ) anyerror!Expression {
         return switch (expr) {
             .literal => switch (expr.literal) {
@@ -250,7 +270,7 @@ pub const Runner = struct {
             },
             .identifier => |id| {
                 if (variables.get(id.name)) |value| {
-                    return value;
+                    return value.*;
                 } else if (self.std_functions.get(id.name) != null) {
                     return expr;
                 } else if (self.functions.get(id.name) != null) {
@@ -368,7 +388,7 @@ pub const Runner = struct {
     fn call_function(
         self: Runner,
         call: Call,
-        variables: *std.StringHashMap(Expression),
+        variables: *std.StringHashMap(*Expression),
     ) !Expression {
         const callee = try self.evaluate_expression(call.callee.*, variables);
         switch (callee) {
@@ -380,12 +400,25 @@ pub const Runner = struct {
                 };
             },
             .identifier => |id| {
-                var arguments: std.ArrayList(Expression) = std.ArrayList(Expression).init(self.allocator);
+                var arguments: std.ArrayList(*Expression) = std.ArrayList(*Expression).init(self.allocator);
 
                 if (call.arguments != null) {
                     for (call.arguments.?.items) |arg| {
-                        const evaluated = try self.evaluate_expression(arg, variables);
-                        try arguments.append(evaluated);
+                        switch (arg) {
+                            .identifier => |idtfr| {
+                                if (variables.get(idtfr.name)) |value| {
+                                    try arguments.append(value);
+                                } else {
+                                    try self.stderr.print("Undefined variable: {s}\n", .{idtfr.name});
+                                    std.process.exit(1);
+                                }
+                            },
+                            else => |expr| {
+                                const tmp = try self.allocator.create(Expression);
+                                tmp.* = try self.evaluate_expression(expr, variables);
+                                try arguments.append(tmp);
+                            },
+                        }
                     }
                 }
 
@@ -405,7 +438,7 @@ pub const Runner = struct {
         }
     }
 
-    fn run_function(self: Runner, func: Statement, args: []Expression) anyerror!Expression {
+    fn run_function(self: Runner, func: Statement, args: []*Expression) anyerror!Expression {
         const func_decl = func.function_declaration;
 
         if (args.len != func_decl.parameters.items.len) {
@@ -417,7 +450,7 @@ pub const Runner = struct {
             std.process.exit(1);
         }
 
-        var local_vars = std.StringHashMap(Expression).init(self.allocator);
+        var local_vars = std.StringHashMap(*Expression).init(self.allocator);
         defer local_vars.deinit();
 
         for (0..args.len) |i| {

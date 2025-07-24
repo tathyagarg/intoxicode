@@ -33,7 +33,7 @@ const paths: Record<string, Path> = {
   },
   'operators': {
     name: 'Operators',
-    prev: 'variables',
+    prev: 'arrays',
     next: 'flow-control'
   },
   'flow-control': {
@@ -54,11 +54,17 @@ const paths: Record<string, Path> = {
   'built-in-functions': {
     name: 'Built-in Functions',
     prev: 'exception-handling',
+    next: 'array-functions'
+  },
+  'array-functions': {
+    name: 'Array Functions',
+    level: 2,
+    prev: 'built-in-functions',
     next: 'directives'
   },
   'directives': {
     name: 'Directives',
-    prev: 'built-in-functions',
+    prev: 'array-functions',
   },
 }
 
