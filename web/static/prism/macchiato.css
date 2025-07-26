@@ -113,6 +113,10 @@ pre[class*="language-"] {
 	color: #8aadf4;
 }
 
+.token.directive {
+  color: #f5a97f;
+}
+
 /* Diff */
 
 .token.deleted {
@@ -132,4 +136,3 @@ pre[class*="language-"] {
 .token.italic {
 	font-style: italic;
 }
-
