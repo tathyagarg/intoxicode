@@ -1,0 +1,7 @@
+@all
+
+fun add_one(x) {
+    throwaway x + 1
+}
+
+@export(add_one)

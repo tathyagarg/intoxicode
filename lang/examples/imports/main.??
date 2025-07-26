@@ -1,0 +1,4 @@
+@all
+@import("lib.??")
+
+scream(add_one(1))

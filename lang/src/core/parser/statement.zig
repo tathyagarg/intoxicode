@@ -218,6 +218,7 @@ pub const ThrowawayStatement = struct {
 
 pub const Directive = struct {
     name: []const u8,
+    arguments: ?std.ArrayList([]const u8),
 
     pub fn pretty_print(self: Directive, allocator: std.mem.Allocator) anyerror![]const u8 {
         var builder = std.ArrayList(u8).init(allocator);
@@ -225,6 +226,17 @@ pub const Directive = struct {
 
         try builder.appendSlice("@");
         try builder.appendSlice(self.name);
+
+        if (self.arguments) |args| {
+            try builder.appendSlice("(");
+            for (args.items, 0..) |arg, i| {
+                if (i > 0) {
+                    try builder.appendSlice(", ");
+                }
+                try builder.appendSlice(arg);
+            }
+            try builder.appendSlice(")");
+        }
 
         return try builder.toOwnedSlice();
     }

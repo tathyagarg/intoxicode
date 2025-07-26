@@ -15,6 +15,8 @@ const FeatureFlags = struct {
     repitition: bool = true,
 };
 
+const run_file = @import("../full_run.zig").run_file;
+
 const WEIGHT_ARRAY = [_]u8{ 1, 1, 1, 1, 1, 2, 2, 2, 3 };
 const WEIGHT_LENGTH = WEIGHT_ARRAY.len;
 
@@ -34,6 +36,8 @@ pub const Runner = struct {
 
     features: *FeatureFlags,
 
+    exports: *std.StringHashMap(Statement),
+
     pub fn init(
         allocator: std.mem.Allocator,
         stdout: std.io.AnyWriter,
@@ -45,6 +49,9 @@ pub const Runner = struct {
 
         const functions = try allocator.create(std.StringHashMap(Statement));
         functions.* = std.StringHashMap(Statement).init(allocator);
+
+        const exports = try allocator.create(std.StringHashMap(Statement));
+        exports.* = std.StringHashMap(Statement).init(allocator);
 
         var std_functions = std.StringHashMap(StdFunction).init(allocator);
         std_functions.putNoClobber("scream", stdlib.scream) catch unreachable;
@@ -86,6 +93,8 @@ pub const Runner = struct {
             .max_certains_available = @max(2, statements.len / 4),
 
             .features = features,
+
+            .exports = exports,
         };
     }
 
@@ -182,6 +191,31 @@ pub const Runner = struct {
                             } else if (std.mem.eql(u8, target, "all")) {
                                 self.features.uncertainty = false;
                                 self.features.repitition = false;
+                            } else if (std.mem.eql(u8, target, "export")) {
+                                std.debug.print("Exporting functions:\n", .{});
+
+                                for (directive.arguments.?.items) |arg| {
+                                    if (self.functions.get(arg)) |func_stmt| {
+                                        try self.exports.put(arg, func_stmt);
+                                        std.debug.print("  {s}\n", .{arg});
+                                    } else {
+                                        try self.stderr.print("Function '{s}' not found for export\n", .{arg});
+                                        std.process.exit(1);
+                                    }
+                                }
+                            } else if (std.mem.eql(u8, target, "import")) {
+                                const sub_runner = try run_file(self.allocator, directive.arguments.?.items[0]);
+
+                                var iterator = sub_runner.exports.iterator();
+
+                                while (iterator.next()) |exported| {
+                                    if (self.exports.get(exported.key_ptr.*) != null) {
+                                        try self.stderr.print("Export '{s}' already exists, cannot import again\n", .{exported.key_ptr.*});
+                                        std.process.exit(1);
+                                    }
+                                    std.debug.print("Importing function: {s}\n", .{exported.key_ptr.*});
+                                    try self.functions.put(exported.key_ptr.*, exported.value_ptr.*);
+                                }
                             } else {
                                 try self.stderr.print("Unknown directive: {s}\n", .{target});
                                 std.process.exit(1);

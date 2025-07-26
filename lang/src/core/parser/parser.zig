@@ -5,6 +5,7 @@ pub const statements = @import("statement.zig");
 
 const Expression = expressions.Expression;
 const Statement = statements.Statement;
+const Identifier = expressions.Identifier;
 
 const _tokens = @import("../lexer/tokens.zig");
 const Token = _tokens.Token;
@@ -157,15 +158,38 @@ pub const Parser = struct {
         const feature = try self.consume(.Identifier, "Expected feature name after '@'");
         const stmt = try self.allocator.create(Statement);
 
+        const arguments = try self.allocator.create(std.ArrayList([]const u8));
+        arguments.* = std.ArrayList([]const u8).init(self.allocator);
+
         if (std.mem.eql(u8, feature.value, "uncertainty") or std.mem.eql(u8, feature.value, "all")) {
             self.certainty_mods.* = false;
+        } else if (std.mem.eql(u8, feature.value, "export")) {
+            _ = try self.consume(.LeftParen, "Expected '(' after '@export' directive.");
+
+            while (!self.is_at_end() and !self.check(.RightParen)) {
+                const exported_func = try self.consume(.Identifier, "Expected function name after '@export' directive.");
+
+                try arguments.append(exported_func.value);
+            }
+
+            _ = try self.consume(.RightParen, "Expected ')' after exported functions in '@export' directive.");
+        } else if (std.mem.eql(u8, feature.value, "import")) {
+            _ = try self.consume(.LeftParen, "Expected '(' after '@import' directive.");
+
+            const imported_file = try self.consume(.String, "Expected file name after '@import' directive.");
+            try arguments.append(imported_file.value);
+
+            _ = try self.consume(.RightParen, "Expected ')' after imported functions in '@import' directive.");
         }
 
         stmt.* = Statement{
             .directive = statements.Directive{
                 .name = feature.value,
+                .arguments = if (arguments.items.len > 0) arguments.* else null,
             },
         };
+
+        std.debug.print("Directive: {s}\n", .{try stmt.pretty_print(self.allocator)});
 
         return stmt;
     }
