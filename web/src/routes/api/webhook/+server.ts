@@ -27,14 +27,22 @@ export async function POST({ request }: { request: Request }) {
     }, { status: 401 })
   }
 
-  queueMicrotask(async () => await processData(JSON.parse(body)));
+  queueMicrotask(async () => await processWebhook(JSON.parse(body), headers.get('x-github-event') ?? 'unknown'));
 
   return json({}, {
     status: 200
   })
 }
 
-async function processData(data: any) {
+async function processWebhook(data: any, event: string) {
+  if (event === 'workflow_job') {
+    await workflowJob(data);
+  } else if (event === 'push') {
+    await pushEvent();
+  }
+}
+
+async function workflowJob(data: any) {
   if (data.action !== 'completed') {
     return
   }
@@ -62,6 +70,12 @@ async function processData(data: any) {
     spawn('chmod', ['+x', fp])
   }
 
+  spawn('npm', ['install'])
+  spawn('npm', ['run', 'build'])
+}
+
+async function pushEvent() {
+  spawn('git', ['pull'])
   spawn('npm', ['install'])
   spawn('npm', ['run', 'build'])
 }
