@@ -1,5 +1,10 @@
-# Intoxicode
-Run code like you're drunk!
+<div align="center">
+
+  <img src="./assets/logo.svg" alt="Logo" width="50%">
+
+  [Intoxicode](https://intoxicode.arson.dev) is an [esolang](https://esolangs.org/wiki/Main_Page) that simulates a drunken program with uncertain behavior.
+
+</div>
 
 ## Features
 1. Statements ending with `.` are certain, `?` are uncertain.
