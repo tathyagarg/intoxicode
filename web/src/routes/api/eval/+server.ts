@@ -11,8 +11,8 @@ export async function POST({ request }: { request: any }) {
   let stdout = '';
   let stderr = '';
 
-  proc.stdout.on('data', (data) => { stdout += data.toString(); });
-  proc.stderr.on('data', (data) => { stderr += data.toString(); });
+  proc.stdout.on('data', (data: any) => { stdout += data.toString(); });
+  proc.stderr.on('data', (data: any) => { stderr += data.toString(); });
 
   await new Promise((resolve, reject) => { proc.on('close', resolve); });
 

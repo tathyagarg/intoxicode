@@ -26,9 +26,6 @@ jobs:
         with:
           fallback: 1.0.0
 
-      - name: Copy to website assets
-        run: mkdir -p web/static/assets/releases && cp lang/zig-out/bin/intoxicode-* web/static/assets/releases/
-
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
