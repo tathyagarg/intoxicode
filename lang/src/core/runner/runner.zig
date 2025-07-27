@@ -38,6 +38,8 @@ var std_functions = std.StaticStringMap(StdFunction).initComptime(.{
     .{ "find_first", stdlib.find_first },
     .{ "find_last", stdlib.find_last },
     .{ "update", stdlib.update },
+    .{ "sin", stdlib.sin },
+    .{ "cos", stdlib.cos },
 });
 
 pub const Runner = struct {
