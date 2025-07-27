@@ -65,7 +65,13 @@ const paths: Record<string, Path> = {
   'directives': {
     name: 'Directives',
     prev: 'array-functions',
+    next: 'imports'
   },
+  'imports': {
+    name: 'Imports',
+    level: 2,
+    prev: 'directives',
+  }
 }
 
 export default paths;
