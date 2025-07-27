@@ -30,7 +30,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            tag_name: ${{setups.previous_tag.outputs.tag}}
+            tag_name: ${{steps.previous_tag.outputs.tag}}
             lang/zig-out/bin/intoxicode-*
 
 
