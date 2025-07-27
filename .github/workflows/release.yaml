@@ -33,4 +33,3 @@ jobs:
           files: |
             lang/zig-out/bin/intoxicode-*
 
-
