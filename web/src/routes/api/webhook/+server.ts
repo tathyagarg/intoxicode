@@ -1,7 +1,7 @@
 import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import { json } from "@sveltejs/kit";
-import { spawn } from 'child_process';
+import { execSync } from 'child_process';
 import { Webhooks } from "@octokit/webhooks"
 import { GITHUB_SECRET } from "$env/static/private"
 import { PUBLIC_RUNNER_OS } from "$env/static/public";
@@ -47,7 +47,7 @@ async function workflowJob(data: any) {
     return
   }
 
-  spawn('git', ['pull'])
+  execSync('git', ['pull'])
 
   const releases = await fetch('https://api.github.com/repos/tathyagarg/intoxicode/releases/latest')
   const release_data = await releases.json()
@@ -67,15 +67,15 @@ async function workflowJob(data: any) {
     await mkdir(downloadDir, { recursive: true })
     await writeFile(fp, uint8Array);
 
-    spawn('chmod', ['+x', fp])
+    execSync('chmod', ['+x', fp])
   }
 
-  spawn('npm', ['install'])
-  spawn('npm', ['run', 'build'])
+  execSync('npm', ['install'])
+  execSync('npm', ['run', 'build'])
 }
 
 async function pushEvent() {
-  spawn('git', ['pull'])
-  spawn('npm', ['install'])
-  spawn('npm', ['run', 'build'])
+  execSync('git', ['pull'])
+  execSync('npm', ['install'])
+  execSync('npm', ['run', 'build'])
 }
