@@ -29,8 +29,8 @@ jobs:
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{steps.previous_tag.outputs.tag}}
           files: |
-            tag_name: ${{steps.previous_tag.outputs.tag}}
             lang/zig-out/bin/intoxicode-*
 
 
