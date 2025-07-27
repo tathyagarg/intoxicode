@@ -1,0 +1,8 @@
+@all
+@import("../lib.??")
+
+fun add_two(x) {
+  throwaway add_one(add_one(x))
+}
+
+@export(add_two)

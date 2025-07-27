@@ -20,6 +20,26 @@ const run_file = @import("../full_run.zig").run_file;
 const WEIGHT_ARRAY = [_]u8{ 1, 1, 1, 1, 1, 2, 2, 2, 3 };
 const WEIGHT_LENGTH = WEIGHT_ARRAY.len;
 
+var std_functions = std.StaticStringMap(StdFunction).initComptime(.{
+    .{ "scream", stdlib.scream },
+    .{ "abs", stdlib.abs },
+    .{ "min", stdlib.min },
+    .{ "max", stdlib.max },
+    .{ "pow", stdlib.pow },
+    .{ "sqrt", stdlib.sqrt },
+    .{ "length", stdlib.length },
+    .{ "to_string", stdlib.to_string },
+    .{ "to_number", stdlib.to_number },
+    .{ "is_digit", stdlib.is_digit },
+    .{ "chr", stdlib.chr },
+    .{ "append", stdlib.append },
+    .{ "insert", stdlib.insert },
+    .{ "remove", stdlib.remove },
+    .{ "find_first", stdlib.find_first },
+    .{ "find_last", stdlib.find_last },
+    .{ "update", stdlib.update },
+});
+
 pub const Runner = struct {
     allocator: std.mem.Allocator,
     stdout: std.io.AnyWriter,
@@ -29,12 +49,12 @@ pub const Runner = struct {
     functions: *std.StringHashMap(Statement),
     statements: []*Statement,
 
-    std_functions: std.StringHashMap(StdFunction),
-
     certain_count: *usize,
     max_certains_available: usize,
 
     features: *FeatureFlags,
+
+    location: []const u8,
 
     exports: *std.StringHashMap(Statement),
 
@@ -43,6 +63,7 @@ pub const Runner = struct {
         stdout: std.io.AnyWriter,
         stderr: std.io.AnyWriter,
         statements: []*Statement,
+        location: []const u8,
     ) !Runner {
         const variables = try allocator.create(std.StringHashMap(*Expression));
         variables.* = std.StringHashMap(*Expression).init(allocator);
@@ -52,25 +73,6 @@ pub const Runner = struct {
 
         const exports = try allocator.create(std.StringHashMap(Statement));
         exports.* = std.StringHashMap(Statement).init(allocator);
-
-        var std_functions = std.StringHashMap(StdFunction).init(allocator);
-        std_functions.putNoClobber("scream", stdlib.scream) catch unreachable;
-        std_functions.putNoClobber("abs", stdlib.abs) catch unreachable;
-        std_functions.putNoClobber("min", stdlib.min) catch unreachable;
-        std_functions.putNoClobber("max", stdlib.max) catch unreachable;
-        std_functions.putNoClobber("pow", stdlib.pow) catch unreachable;
-        std_functions.putNoClobber("sqrt", stdlib.sqrt) catch unreachable;
-        std_functions.putNoClobber("length", stdlib.length) catch unreachable;
-        std_functions.putNoClobber("to_string", stdlib.to_string) catch unreachable;
-        std_functions.putNoClobber("to_number", stdlib.to_number) catch unreachable;
-        std_functions.putNoClobber("is_digit", stdlib.is_digit) catch unreachable;
-        std_functions.putNoClobber("chr", stdlib.chr) catch unreachable;
-        std_functions.putNoClobber("append", stdlib.append) catch unreachable;
-        std_functions.putNoClobber("insert", stdlib.insert) catch unreachable;
-        std_functions.putNoClobber("remove", stdlib.remove) catch unreachable;
-        std_functions.putNoClobber("find_first", stdlib.find_first) catch unreachable;
-        std_functions.putNoClobber("find_last", stdlib.find_last) catch unreachable;
-        std_functions.putNoClobber("update", stdlib.update) catch unreachable;
 
         const certain_count = try allocator.create(usize);
         certain_count.* = 0;
@@ -87,7 +89,6 @@ pub const Runner = struct {
 
             .stdout = stdout,
             .stderr = stderr,
-            .std_functions = std_functions,
 
             .certain_count = certain_count,
             .max_certains_available = @max(2, statements.len / 4),
@@ -95,6 +96,7 @@ pub const Runner = struct {
             .features = features,
 
             .exports = exports,
+            .location = location,
         };
     }
 
@@ -192,28 +194,46 @@ pub const Runner = struct {
                                 self.features.uncertainty = false;
                                 self.features.repitition = false;
                             } else if (std.mem.eql(u8, target, "export")) {
-                                std.debug.print("Exporting functions:\n", .{});
-
                                 for (directive.arguments.?.items) |arg| {
                                     if (self.functions.get(arg)) |func_stmt| {
                                         try self.exports.put(arg, func_stmt);
-                                        std.debug.print("  {s}\n", .{arg});
                                     } else {
                                         try self.stderr.print("Function '{s}' not found for export\n", .{arg});
                                         std.process.exit(1);
                                     }
                                 }
                             } else if (std.mem.eql(u8, target, "import")) {
-                                const sub_runner = try run_file(self.allocator, directive.arguments.?.items[0]);
+                                const dirname = std.fs.path.dirname(try std.fs.cwd().realpathAlloc(self.allocator, self.location)) orelse ".";
+                                const import_target = directive.arguments.?.items[0];
 
-                                var iterator = sub_runner.exports.iterator();
+                                var imported_file = try self.allocator.alloc(u8, dirname.len + import_target.len + 1); // self.location.dirname().?; // directive.arguments.?.items[0];
 
-                                while (iterator.next()) |exported| {
+                                @memcpy(imported_file[0..dirname.len], dirname);
+                                @memcpy(imported_file[dirname.len .. dirname.len + 1], "/");
+                                @memcpy(imported_file[dirname.len + 1 ..], import_target);
+
+                                var sub_runner: Runner = undefined;
+
+                                if (!std.mem.eql(u8, imported_file[imported_file.len - 3 .. imported_file.len], ".??")) {
+                                    var target_file = try self.allocator.alloc(u8, imported_file.len + "/huh.??".len);
+
+                                    @memcpy(target_file[0..imported_file.len], imported_file);
+                                    @memcpy(target_file[imported_file.len..], "/huh.??");
+
+                                    imported_file = target_file;
+                                }
+
+                                sub_runner = try run_file(self.allocator, imported_file);
+                                var export_iterator = sub_runner.exports.iterator();
+
+                                while (export_iterator.next()) |exported| {
                                     if (self.exports.get(exported.key_ptr.*) != null) {
-                                        try self.stderr.print("Export '{s}' already exists, cannot import again\n", .{exported.key_ptr.*});
+                                        try self.stderr.print(
+                                            "Export '{s}' already exists, cannot import again\n",
+                                            .{exported.key_ptr.*},
+                                        );
                                         std.process.exit(1);
                                     }
-                                    std.debug.print("Importing function: {s}\n", .{exported.key_ptr.*});
                                     try self.functions.put(exported.key_ptr.*, exported.value_ptr.*);
                                 }
                             } else {
@@ -226,7 +246,10 @@ pub const Runner = struct {
 
                             const count = try self.evaluate_expression(repeat_stmt.count, variables);
                             if (count.literal != .number) {
-                                try self.stderr.print("Repeat count must be a number, got: {s}\n", .{try count.literal.to_string(self.allocator, self)});
+                                try self.stderr.print(
+                                    "Repeat count must be a number, got: {s}\n",
+                                    .{try count.literal.to_string(self.allocator, self)},
+                                );
                                 std.process.exit(1);
                             }
 
@@ -305,7 +328,7 @@ pub const Runner = struct {
             .identifier => |id| {
                 if (variables.get(id.name)) |value| {
                     return value.*;
-                } else if (self.std_functions.get(id.name) != null) {
+                } else if (std_functions.get(id.name) != null) {
                     return expr;
                 } else if (self.functions.get(id.name) != null) {
                     return Expression{
@@ -456,7 +479,7 @@ pub const Runner = struct {
                     }
                 }
 
-                if (self.std_functions.get(id.name)) |func| {
+                if (std_functions.get(id.name)) |func| {
                     return try func(self, arguments.items);
                 } else if (self.functions.get(id.name)) |func_stmt| {
                     return try self.run_function(func_stmt, arguments.items);

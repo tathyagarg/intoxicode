@@ -1,4 +1,8 @@
 @all
 @import("lib.??")
+@import("module")
 
-scream(add_one(1))
+scream(add_one(1), "\n")
+scream(add_two(2), "\n")
+modGreet("Tathya")
+modLib()

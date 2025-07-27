@@ -24,7 +24,7 @@ pub fn build(b: *std.Build) !void {
             .{
                 @tagName(target.os_tag.?),
                 @tagName(target.cpu_arch.?),
-            }
+            },
         );
 
         const exe = b.addExecutable(.{
@@ -65,4 +65,3 @@ pub fn build(b: *std.Build) !void {
 
     test_step.dependOn(&run_exe_unit_tests.step);
 }
-

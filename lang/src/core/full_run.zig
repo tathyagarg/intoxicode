@@ -17,7 +17,7 @@ pub fn run_file(allocator: std.mem.Allocator, fname: []const u8) anyerror!Runner
     const stdout = std.io.getStdOut().writer();
     const stderr = std.io.getStdErr().writer();
 
-    const runner = try Runner.init(allocator, stdout.any(), stderr.any(), statements.items);
+    const runner = try Runner.init(allocator, stdout.any(), stderr.any(), statements.items, try std.fs.cwd().realpathAlloc(allocator, fname));
     _ = try runner.run();
 
     return runner;

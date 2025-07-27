@@ -161,18 +161,16 @@ pub const Lexer = struct {
             '0'...'9' => try self.add_token(try self.number()),
             ' ', '\n', '\r', '\t' => {}, // Ignore whitespace
             else => {
-                std.debug.print("Input: {s}\n", .{self.input});
-
                 for (self.tokens.items) |token| {
                     std.debug.print("Token: {s} ({})\n", .{ token.value, token.token_type });
                 }
 
-                std.debug.print("Unexpected character: '{c}' ({d}) at line, position {d}\n", .{
+                std.debug.panic("Unexpected character: '{c}' ({d}) at line, position {d}\n", .{
                     self.current_char,
                     self.current_char,
                     self.position,
                 });
-                unreachable; // Handle unexpected characters
+                std.process.exit(0);
             },
         }
     }

@@ -50,10 +50,11 @@ pub fn main() !void {
         try cli_parser.parse(std.os.argv);
     }
 
-    const data = if (cli_parser.arguments.get("file").?.value == null)
+    const file_value = cli_parser.arguments.get("file").?.value;
+    const data = if (file_value == null)
         cli_parser.arguments.get("content").?.value.?
     else
-        try loader.load_file(allocator, cli_parser.arguments.get("file").?.value.?);
+        try loader.load_file(allocator, file_value.?);
 
     var lexer = Lexer.init(data, allocator);
 
@@ -62,7 +63,16 @@ pub fn main() !void {
     var parser = try Parser.init(lexer.tokens, allocator);
     const statements = try parser.parse();
 
-    const runner = try Runner.init(allocator, stdout.any(), stderr.any(), statements.items);
+    const runner = try Runner.init(
+        allocator,
+        stdout.any(),
+        stderr.any(),
+        statements.items,
+        if (file_value) |v|
+            try std.fs.cwd().realpathAlloc(allocator, v)
+        else
+            try std.fs.cwd().realpathAlloc(allocator, "main.??"),
+    );
 
     _ = try runner.run();
 }

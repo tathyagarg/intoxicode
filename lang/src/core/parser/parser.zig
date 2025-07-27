@@ -189,8 +189,6 @@ pub const Parser = struct {
             },
         };
 
-        std.debug.print("Directive: {s}\n", .{try stmt.pretty_print(self.allocator)});
-
         return stmt;
     }
 

@@ -1,0 +1,7 @@
+@all
+
+fun modLib() {
+    scream("MEOW!\n")
+}
+
+@export(modLib)

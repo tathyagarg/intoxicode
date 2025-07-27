@@ -1,0 +1,9 @@
+@all
+@import("sublib.??")
+@import("add_two.??")
+
+fun modGreet(name) {
+    scream("Goodbye ", name, "! >:)\n")
+}
+
+@export(modGreet modLib add_two)

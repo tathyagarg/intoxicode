@@ -1,0 +1,27 @@
+name: Release
+
+on:
+  push:
+  - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mlugg/setup-zig@v2
+        with:
+          version: 0.13.0
+
+      - name: Build
+        working-directory: lang
+        run: zig build -Dall=true -Doptimize=ReleaseFast
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            lang/zig-out/bin/intoxicode-*
+
