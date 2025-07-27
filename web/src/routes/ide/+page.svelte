@@ -149,7 +149,7 @@
           </button>
         </div>
       </div>
-      <div id="code" class="mt-4 h-full rounded-md"></div>
+      <div id="code" class="mt-4 h-full rounded-md overflow-scroll"></div>
     </div>
 
     <div class="flex flex-col gap-4 w-1/3">
