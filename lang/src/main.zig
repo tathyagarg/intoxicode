@@ -71,7 +71,7 @@ pub fn main() !void {
         if (file_value) |v|
             try std.fs.cwd().realpathAlloc(allocator, v)
         else
-            try std.fs.cwd().realpathAlloc(allocator, "main.??"),
+            try std.fs.cwd().realpathAlloc(allocator, "."),
     );
 
     _ = try runner.run();
