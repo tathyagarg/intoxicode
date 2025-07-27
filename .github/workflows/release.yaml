@@ -20,10 +20,17 @@ jobs:
         working-directory: lang
         run: zig build -Dall=true -Doptimize=ReleaseFast
 
+      - name: Previous Tag
+        id: previous_tag
+        uses: WyriHaximus/github-action-get-previous-tag@v1
+        with:
+          fallback: 1.0.0
+
       - name: Upload to release
         uses: softprops/action-gh-release@v2
         with:
           files: |
+            tag_name: ${{setups.previous_tag.outputs.tag}}
             lang/zig-out/bin/intoxicode-*
 
 
