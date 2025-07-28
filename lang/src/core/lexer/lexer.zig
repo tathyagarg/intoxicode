@@ -107,6 +107,7 @@ pub const Lexer = struct {
             '.' => try self.add_token(TokenType.Period),
             '?' => try self.add_token(TokenType.QuestionMark),
             ',' => try self.add_token(TokenType.Comma),
+            '~' => try self.add_token(TokenType.GetAttribute),
             '#' => while (!self.at_end() and self.current_char != '\n') self.advance(),
             '@' => try self.add_token(.Directive),
             '=' => {
@@ -121,6 +122,13 @@ pub const Lexer = struct {
                 if (self.peek() == '=') {
                     self.advance(); // Consume the '='
                     try self.add_token(TokenType.NotEqual);
+                } else {
+                    std.debug.panic("Unexpected character: '{c}' ({d}) at line, position {d}\n", .{
+                        self.current_char,
+                        self.current_char,
+                        self.position,
+                    });
+                    std.process.exit(0);
                 }
             },
             'a'...'z', 'A'...'Z', '_' => {

@@ -25,6 +25,26 @@ fn u8_to_u32(parts: [4]u8) u32 {
         @as(u32, parts[3]);
 }
 
+const AF_UNSPEC = 0;
+const AF_UNIX = 1;
+const AF_INET = 2;
+const AF_AX25 = 3;
+const AF_IPX = 4;
+const AF_APPLETALK = 5;
+const AF_NETROM = 6;
+const AF_BRIDGE = 7;
+const AF_AAL5 = 8;
+const AF_X25 = 9;
+const AF_INET6 = 10;
+const AF_MAX = 12;
+
+const SOCK_STREAM = 1;
+const SOCK_DGRAM = 2;
+const SOCK_RAW = 3;
+const SOCK_RDM = 4;
+const SOCK_SEQPACKET = 5;
+const SOCK_PACKET = 10;
+
 pub fn socket(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(3, &.{ &.{.number}, &.{.number}, &.{.number} }, "socket", runner, args);
 
@@ -105,25 +125,25 @@ pub const Socket = Module{
     }),
     .constants = std.StaticStringMap(Expression).initComptime(.{
         // Address families
-        .{ "AF_UNSPEC", Expression{ .literal = .{ .number = @floatFromInt(0) } } },
-        .{ "AF_UNIX", Expression{ .literal = .{ .number = @floatFromInt(1) } } },
-        .{ "AF_INET", Expression{ .literal = .{ .number = @floatFromInt(2) } } },
-        .{ "AF_AX25", Expression{ .literal = .{ .number = @floatFromInt(3) } } },
-        .{ "AF_IPX", Expression{ .literal = .{ .number = @floatFromInt(4) } } },
-        .{ "AF_APPLETALK", Expression{ .literal = .{ .number = @floatFromInt(5) } } },
-        .{ "AF_NETROM", Expression{ .literal = .{ .number = @floatFromInt(6) } } },
-        .{ "AF_BRIDGE", Expression{ .literal = .{ .number = @floatFromInt(7) } } },
-        .{ "AF_AAL5", Expression{ .literal = .{ .number = @floatFromInt(8) } } },
-        .{ "AF_X25", Expression{ .literal = .{ .number = @floatFromInt(9) } } },
-        .{ "AF_INET6", Expression{ .literal = .{ .number = @floatFromInt(10) } } },
-        .{ "AF_MAX", Expression{ .literal = .{ .number = @floatFromInt(12) } } },
+        .{ "AF_UNSPEC", Expression{ .literal = .{ .number = @floatFromInt(AF_UNSPEC) } } },
+        .{ "AF_UNIX", Expression{ .literal = .{ .number = @floatFromInt(AF_UNIX) } } },
+        .{ "AF_INET", Expression{ .literal = .{ .number = @floatFromInt(AF_INET) } } },
+        .{ "AF_AX25", Expression{ .literal = .{ .number = @floatFromInt(AF_AX25) } } },
+        .{ "AF_IPX", Expression{ .literal = .{ .number = @floatFromInt(AF_IPX) } } },
+        .{ "AF_APPLETALK", Expression{ .literal = .{ .number = @floatFromInt(AF_APPLETALK) } } },
+        .{ "AF_NETROM", Expression{ .literal = .{ .number = @floatFromInt(AF_NETROM) } } },
+        .{ "AF_BRIDGE", Expression{ .literal = .{ .number = @floatFromInt(AF_BRIDGE) } } },
+        .{ "AF_AAL5", Expression{ .literal = .{ .number = @floatFromInt(AF_AAL5) } } },
+        .{ "AF_X25", Expression{ .literal = .{ .number = @floatFromInt(AF_X25) } } },
+        .{ "AF_INET6", Expression{ .literal = .{ .number = @floatFromInt(AF_INET6) } } },
+        .{ "AF_MAX", Expression{ .literal = .{ .number = @floatFromInt(AF_MAX) } } },
 
         // Socket types
-        .{ "SOCK_STREAM", Expression{ .literal = .{ .number = @floatFromInt(1) } } },
-        .{ "SOCK_DGRAM", Expression{ .literal = .{ .number = @floatFromInt(2) } } },
-        .{ "SOCK_RAW", Expression{ .literal = .{ .number = @floatFromInt(3) } } },
-        .{ "SOCK_RDM", Expression{ .literal = .{ .number = @floatFromInt(4) } } },
-        .{ "SOCK_SEQPACKET", Expression{ .literal = .{ .number = @floatFromInt(5) } } },
-        .{ "SOCK_PACKET", Expression{ .literal = .{ .number = @floatFromInt(10) } } },
+        .{ "SOCK_STREAM", Expression{ .literal = .{ .number = @floatFromInt(SOCK_STREAM) } } },
+        .{ "SOCK_DGRAM", Expression{ .literal = .{ .number = @floatFromInt(SOCK_DGRAM) } } },
+        .{ "SOCK_RAW", Expression{ .literal = .{ .number = @floatFromInt(SOCK_RAW) } } },
+        .{ "SOCK_RDM", Expression{ .literal = .{ .number = @floatFromInt(SOCK_RDM) } } },
+        .{ "SOCK_SEQPACKET", Expression{ .literal = .{ .number = @floatFromInt(SOCK_SEQPACKET) } } },
+        .{ "SOCK_PACKET", Expression{ .literal = .{ .number = @floatFromInt(SOCK_PACKET) } } },
     }),
 };

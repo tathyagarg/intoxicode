@@ -60,6 +60,10 @@ pub fn main() !void {
 
     try lexer.scan_tokens();
 
+    // for (lexer.tokens.items) |token| {
+    //     std.debug.print("Token: {s} ({})\n", .{ token.value, token });
+    // }
+
     var parser = try Parser.init(lexer.tokens, allocator);
     const statements = try parser.parse();
 

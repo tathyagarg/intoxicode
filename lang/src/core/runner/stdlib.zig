@@ -162,8 +162,8 @@ pub fn to_number(runner: Runner, args: []*Expression) anyerror!Expression {
                 },
             };
         },
-        .array => {
-            try runner.stderr.print("to_number() cannot convert array to number\n", .{});
+        .module, .array => {
+            try runner.stderr.print("to_number() cannot convert given datatype to number\n", .{});
             std.process.exit(1);
         },
         .number => |num| Expression{

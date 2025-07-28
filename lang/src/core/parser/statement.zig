@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const Expression = @import("expressions.zig").Expression;
+const Handler = @import("../runner/runner.zig").Handler;
 
 pub const Statement = union(enum) {
     expression: Expression,
@@ -19,7 +20,10 @@ pub const Statement = union(enum) {
             .assignment => self.assignment.certainty,
             .if_statement => self.if_statement.certainty,
             .loop_statement => self.loop_statement.certainty,
-            .function_declaration => self.function_declaration.certainty,
+            .function_declaration => switch (self.function_declaration) {
+                .intox => self.function_declaration.intox.certainty,
+                .native => 1.0, // Native functions are always certain
+            },
             .try_statement => self.try_statement.certainty,
             .throwaway_statement => self.throwaway_statement.certainty,
             .directive => 1.0,
@@ -33,7 +37,10 @@ pub const Statement = union(enum) {
             .assignment => |*a| a.certainty = certainty,
             .if_statement => |*i| i.certainty = certainty,
             .loop_statement => |*l| l.certainty = certainty,
-            .function_declaration => |*f| f.certainty = certainty,
+            .function_declaration => |*f| switch (f.*) {
+                .intox => f.intox.certainty = certainty,
+                .native => {}, // Native functions do not have certainty
+            },
             .try_statement => |*t| t.certainty = certainty,
             .throwaway_statement => |*t| t.certainty = certainty,
             .directive => {},
@@ -58,7 +65,7 @@ pub const Statement = union(enum) {
                 return try builder.toOwnedSlice();
             },
             .if_statement => |i| i.pretty_print(allocator),
-            .function_declaration => |f| f.pretty_print(allocator),
+            .function_declaration => "",
             .throwaway_statement => |t| t.pretty_print(allocator),
             .loop_statement => |l| l.pretty_print(allocator),
             .try_statement => |t| t.pretty_print(allocator),
@@ -128,7 +135,19 @@ pub const LoopStatement = struct {
     }
 };
 
-pub const FunctionDeclaration = struct {
+pub const FunctionDeclaration = union(enum) {
+    intox: IntoxFunctionDeclaration,
+    native: NativeFunctionDeclaration,
+
+    pub fn name(self: FunctionDeclaration) []const u8 {
+        return switch (self) {
+            .intox => self.intox.name,
+            .native => self.native.name,
+        };
+    }
+};
+
+pub const IntoxFunctionDeclaration = struct {
     name: []const u8,
     parameters: std.ArrayList([]const u8),
     body: std.ArrayList(*Statement),
@@ -164,6 +183,11 @@ pub const FunctionDeclaration = struct {
 
         return result;
     }
+};
+
+pub const NativeFunctionDeclaration = struct {
+    name: []const u8,
+    handler: Handler,
 };
 
 pub const TryStatement = struct {

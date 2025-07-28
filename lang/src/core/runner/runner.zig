@@ -45,6 +45,7 @@ const std_functions = std.StaticStringMap(StdFunction).initComptime(.{
 
 const std_modules = std.StaticStringMap(Module).initComptime(.{
     .{ "socket", @import("modules/socket.zig").Socket },
+    .{ "fs", @import("modules/fs.zig").Fs },
 });
 
 pub fn require(
@@ -85,7 +86,8 @@ pub const Runner = struct {
     stderr: std.io.AnyWriter,
 
     variables: *std.StringHashMap(*Expression),
-    zig_functions: *std.StringHashMap(Handler),
+    modules: *std.StringHashMap(Module),
+    // zig_functions: *std.StringHashMap(Handler),
     functions: *std.StringHashMap(Statement),
     statements: []*Statement,
 
@@ -108,8 +110,11 @@ pub const Runner = struct {
         const variables = try allocator.create(std.StringHashMap(*Expression));
         variables.* = std.StringHashMap(*Expression).init(allocator);
 
-        const zig_functions = try allocator.create(std.StringHashMap(Handler));
-        zig_functions.* = std.StringHashMap(Handler).init(allocator);
+        const modules = try allocator.create(std.StringHashMap(Module));
+        modules.* = std.StringHashMap(Module).init(allocator);
+
+        // const zig_functions = try allocator.create(std.StringHashMap(Handler));
+        // zig_functions.* = std.StringHashMap(Handler).init(allocator);
 
         const functions = try allocator.create(std.StringHashMap(Statement));
         functions.* = std.StringHashMap(Statement).init(allocator);
@@ -127,7 +132,8 @@ pub const Runner = struct {
             .allocator = allocator,
 
             .variables = variables,
-            .zig_functions = zig_functions,
+            .modules = modules,
+            // .zig_functions = zig_functions,
             .functions = functions,
             .statements = statements,
 
@@ -200,7 +206,7 @@ pub const Runner = struct {
                             }
                         },
                         .function_declaration => |func_decl| {
-                            try self.functions.put(func_decl.name, statement.*);
+                            try self.functions.put(func_decl.name(), statement.*);
                         },
                         .throwaway_statement => |throwaway| {
                             return try self.evaluate_expression(throwaway.expression, variables);
@@ -251,8 +257,11 @@ pub const Runner = struct {
                                 const import_target = directive.arguments.?.items[0];
 
                                 if (std_modules.get(import_target)) |mod| {
+                                    try self.modules.put(mod.name, mod);
+
                                     for (mod.functions.kvs.keys, 0..mod.functions.kvs.len) |key, _| {
-                                        try self.zig_functions.put(try std.mem.join(self.allocator, "_", &.{ mod.name, key }), mod.functions.get(key).?);
+                                        _ = .{key};
+                                        // try self.zig_functions.put(try std.mem.join(self.allocator, "_", &.{ mod.name, key }), mod.functions.get(key).?);
                                     }
 
                                     for (mod.constants.kvs.keys, 0..mod.constants.kvs.len) |key, _| {
@@ -385,8 +394,8 @@ pub const Runner = struct {
             .identifier => |id| {
                 if (variables.get(id.name)) |value| {
                     return value.*;
-                } else if (self.zig_functions.get(id.name) != null) {
-                    return expr;
+                    // } else if (self.zig_functions.get(id.name) != null) {
+                    //     return expr;
                 } else if (std_functions.get(id.name) != null) {
                     return expr;
                 } else if (self.functions.get(id.name) != null) {
@@ -395,10 +404,15 @@ pub const Runner = struct {
                             .name = id.name,
                         },
                     };
+                } else if (self.modules.get(id.name)) |mod| {
+                    return Expression{
+                        .literal = Literal{
+                            .module = mod,
+                        },
+                    };
                 }
 
-                try self.stderr.print("Undefined variable: {s}\n", .{id.name});
-                std.process.exit(1);
+                return expr;
             },
             .binary => |binary| {
                 const left = try self.evaluate_expression(binary.left.*, variables);
@@ -492,11 +506,32 @@ pub const Runner = struct {
                     },
                 };
             },
-            .grouping => |group| {
-                return try self.evaluate_expression(group.expression.*, variables);
-            },
-            .call => |call| {
-                return try self.call_function(call, variables);
+            .grouping => |group| try self.evaluate_expression(group.expression.*, variables),
+            .call => |call| try self.call_function(call, variables),
+            .get_attribute => |ga| {
+                const module_expr = try self.evaluate_expression(ga.object.*, variables);
+                if (module_expr.literal != .module) {
+                    try self.stderr.print("Expected a module, got: {s}\n", .{try module_expr.literal.to_string(self.allocator, self)});
+                    std.process.exit(1);
+                }
+
+                const module = module_expr.literal.module;
+
+                const attribute = ga.attribute.identifier;
+
+                if (module.constants.get(attribute.name)) |value| {
+                    return value;
+                } else if (module.functions.get(attribute.name) != null) {
+                    return Expression{
+                        .get_attribute = .{
+                            .object = ga.object,
+                            .attribute = ga.attribute,
+                        },
+                    };
+                } else {
+                    try self.stderr.print("Module '{s}' has no attribute '{s}'\n", .{ module.name, attribute.name });
+                    std.process.exit(1);
+                }
             },
         };
     }
@@ -507,6 +542,35 @@ pub const Runner = struct {
         variables: *std.StringHashMap(*Expression),
     ) !Expression {
         const callee = try self.evaluate_expression(call.callee.*, variables);
+
+        var arguments: std.ArrayList(*Expression) = std.ArrayList(*Expression).init(self.allocator);
+
+        if (call.arguments != null) {
+            for (call.arguments.?.items) |arg| {
+                switch (arg) {
+                    .identifier => |idtfr| {
+                        if (variables.get(idtfr.name)) |value| {
+                            try arguments.append(value);
+                        } else {
+                            try self.stderr.print("Undefined variable: {s}\n", .{idtfr.name});
+
+                            var iter = variables.iterator();
+                            while (iter.next()) |variable| {
+                                try self.stderr.print("  - {s}: {s}\n", .{ variable.key_ptr.*, try variable.value_ptr.*.pretty_print(self.allocator) });
+                            }
+
+                            std.process.exit(1);
+                        }
+                    },
+                    else => |expr| {
+                        const tmp = try self.allocator.create(Expression);
+                        tmp.* = try self.evaluate_expression(expr, variables);
+                        try arguments.append(tmp);
+                    },
+                }
+            }
+        }
+
         switch (callee) {
             .literal => {
                 return Expression{
@@ -516,36 +580,39 @@ pub const Runner = struct {
                 };
             },
             .identifier => |id| {
-                var arguments: std.ArrayList(*Expression) = std.ArrayList(*Expression).init(self.allocator);
-
-                if (call.arguments != null) {
-                    for (call.arguments.?.items) |arg| {
-                        switch (arg) {
-                            .identifier => |idtfr| {
-                                if (variables.get(idtfr.name)) |value| {
-                                    try arguments.append(value);
-                                } else {
-                                    try self.stderr.print("Undefined variable: {s}\n", .{idtfr.name});
-                                    std.process.exit(1);
-                                }
-                            },
-                            else => |expr| {
-                                const tmp = try self.allocator.create(Expression);
-                                tmp.* = try self.evaluate_expression(expr, variables);
-                                try arguments.append(tmp);
-                            },
-                        }
-                    }
-                }
-
                 if (std_functions.get(id.name)) |func| {
                     return try func(self, arguments.items);
-                } else if (self.zig_functions.get(id.name)) |func_stmt| {
-                    return try func_stmt(self, arguments.items);
+                    // } else if (self.zig_functions.get(id.name)) |func_stmt| {
+                    //     return try func_stmt(self, arguments.items);
                 } else if (self.functions.get(id.name)) |func_stmt| {
                     return try self.run_function(func_stmt, arguments.items);
                 } else {
+                    var module_iter = self.modules.iterator();
+                    while (module_iter.next()) |mod| {
+                        if (mod.value_ptr.*.functions.get(id.name)) |func_stmt| {
+                            return func_stmt(self, arguments.items);
+                        }
+                    }
+
                     try self.stderr.print("Undefined function: {s}\n", .{id.name});
+                    std.process.exit(1);
+                }
+            },
+            .get_attribute => |ga| {
+                const module_expr = try self.evaluate_expression(ga.object.*, variables);
+                if (module_expr.literal != .module) {
+                    try self.stderr.print("Expected a module, got: {s}\n", .{try module_expr.literal.to_string(self.allocator, self)});
+                    std.process.exit(1);
+                }
+
+                const module = module_expr.literal.module;
+
+                const attribute = ga.attribute.identifier;
+
+                if (module.functions.get(attribute.name)) |func_stmt| {
+                    return try func_stmt(self, arguments.items);
+                } else {
+                    try self.stderr.print("Module '{s}' has no function '{s}'\n", .{ module.name, attribute.name });
                     std.process.exit(1);
                 }
             },
@@ -557,7 +624,7 @@ pub const Runner = struct {
     }
 
     fn run_function(self: Runner, func: Statement, args: []*Expression) anyerror!Expression {
-        const func_decl = func.function_declaration;
+        const func_decl = func.function_declaration.intox;
 
         if (args.len != func_decl.parameters.items.len) {
             try self.stderr.print("Function '{s}' expects {d} arguments, got {d}\n", .{

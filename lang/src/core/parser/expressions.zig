@@ -1,6 +1,7 @@
 const std = @import("std");
 const Token = @import("../lexer/tokens.zig").Token;
 const Runner = @import("../runner/runner.zig").Runner;
+const Module = @import("../runner/modules/mod.zig").Module;
 
 pub const Expression = union(enum) {
     binary: Binary,
@@ -9,6 +10,7 @@ pub const Expression = union(enum) {
     identifier: Identifier,
     call: Call,
     indexing: Indexing,
+    get_attribute: GetAttribute,
 
     pub fn equals(self: Expression, other: Expression, runner: Runner) !bool {
         return switch (other) {
@@ -39,6 +41,7 @@ pub const Expression = union(enum) {
                             }
                             return true;
                         },
+                        .module => |mod| std.mem.eql(u8, l.module.name, mod.name),
                     };
                 },
                 else => false,
@@ -74,10 +77,11 @@ pub const Expression = union(enum) {
                 },
                 else => false,
             },
+            .get_attribute => false,
         };
     }
 
-    pub fn pretty_print(self: Expression, allocator: std.mem.Allocator) ![]const u8 {
+    pub fn pretty_print(self: Expression, allocator: std.mem.Allocator) anyerror![]const u8 {
         return switch (self) {
             .binary => {
                 const left = try self.binary.left.pretty_print(allocator);
@@ -121,6 +125,10 @@ pub const Expression = union(enum) {
                     items.deinit();
                     return result;
                 },
+                .module => |mod| {
+                    const module_name = mod.name;
+                    return try std.fmt.allocPrint(allocator, "Literal(module = {s})", .{module_name});
+                },
             },
             .identifier => self.identifier.pretty_print(allocator),
             .call => |c| {
@@ -151,6 +159,7 @@ pub const Expression = union(enum) {
                     .{ array_str, index_str },
                 );
             },
+            .get_attribute => |ga| try ga.pretty_print(allocator),
         };
     }
 
@@ -162,6 +171,7 @@ pub const Expression = union(enum) {
             .identifier => self.identifier.certainty,
             .call => self.call.certainty,
             .indexing => 1.0,
+            .get_attribute => 1.0, // attributes are certain if the object is certain
         };
     }
 
@@ -171,7 +181,7 @@ pub const Expression = union(enum) {
             .grouping => |*g| g.certainty = certainty,
             .identifier => |*id| id.certainty = certainty,
             .call => |*c| c.certainty = certainty,
-            .literal, .indexing => {},
+            .get_attribute, .literal, .indexing => {},
         }
     }
 };
@@ -196,6 +206,7 @@ pub const Literal = union(enum) {
     boolean: bool,
     null: ?void,
     array: std.ArrayList(Expression),
+    module: Module,
 
     pub fn number_from_string(s: []const u8) !Literal {
         const number = try std.fmt.parseFloat(f32, s);
@@ -247,6 +258,9 @@ pub const Literal = union(enum) {
                 try result.append(']');
                 return result.toOwnedSlice();
             },
+            .module => |mod| {
+                return try std.fmt.allocPrint(allocator, "Module({s})", .{mod.name});
+            },
         };
     }
 };
@@ -273,4 +287,19 @@ pub const Call = struct {
 pub const Indexing = struct {
     array: *const Expression,
     index: *const Expression,
+};
+
+pub const GetAttribute = struct {
+    object: *const Expression,
+    attribute: *const Expression,
+
+    pub fn pretty_print(self: GetAttribute, allocator: std.mem.Allocator) ![]const u8 {
+        const object_str = try self.object.pretty_print(allocator);
+        defer allocator.free(object_str);
+
+        const attribute_str = try self.attribute.pretty_print(allocator);
+        defer allocator.free(attribute_str);
+
+        return try std.fmt.allocPrint(allocator, "GetAttribute({s} ~ {s})", .{ object_str, attribute_str });
+    }
 };

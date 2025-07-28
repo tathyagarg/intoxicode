@@ -352,9 +352,11 @@ pub const Parser = struct {
         const stmt = try self.allocator.create(Statement);
         stmt.* = Statement{
             .function_declaration = statements.FunctionDeclaration{
-                .name = name,
-                .parameters = params,
-                .body = body,
+                .intox = .{
+                    .name = name,
+                    .parameters = params,
+                    .body = body,
+                },
             },
         };
 
@@ -462,13 +464,13 @@ pub const Parser = struct {
     }
 
     fn comparison(self: *Parser) !Expression {
-        var expr = try self.term();
+        var expr = try self.attribute();
 
         while (self.match((&[_]TokenType{ .GreaterThan, .LessThan })[0..])) {
             const operator = self.previous();
 
             const right = try self.allocator.create(Expression);
-            right.* = try self.term();
+            right.* = try self.attribute();
 
             const left = try self.allocator.create(Expression);
             left.* = expr;
@@ -478,6 +480,27 @@ pub const Parser = struct {
                     .left = left,
                     .operator = operator,
                     .right = right,
+                },
+            };
+        }
+
+        return expr;
+    }
+
+    fn attribute(self: *Parser) !Expression {
+        var expr = try self.term();
+
+        if (self.match(&[_]TokenType{.GetAttribute})) {
+            const right = try self.allocator.create(Expression);
+            right.* = try self.term();
+
+            const left = try self.allocator.create(Expression);
+            left.* = expr;
+
+            expr = Expression{
+                .get_attribute = expressions.GetAttribute{
+                    .object = left,
+                    .attribute = right,
                 },
             };
         }
