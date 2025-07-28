@@ -8,7 +8,7 @@ Opens a file and returns the handle
 
 Arguments:
 1. `fname` (string): Name of the file
-2. `mode` (number): Mode to open the file with. Refer to the subsequent sections on the open mode constants.
+2. `mode` (number): Mode to open the file with. Refer to the subsequent sections on the open mode [constants](#heading-constants)
 
 ```intox
 @all
@@ -69,3 +69,8 @@ _ = (fs ~ seek_by)(handle, -10)
 _ = (fs ~ read)(handle, buffer, 32)
 scream(buffer)  # outputs first 32 bytes starting from byte 6 of the file
 ```
+
+## Constants
+
+- `READ` (number): Open the file for reading (0x1)
+- `WRITE` (number): Open the file for writing (0x2)

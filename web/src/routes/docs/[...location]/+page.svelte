@@ -30,8 +30,6 @@
   let headings: HeadingData[] = $state([]);
 
   onMount(async () => {
-    marked.use(gfmHeadingId({ prefix: "heading-" }));
-
     const renderer = new marked.Renderer();
     renderer.link = ({ href, title, text }) =>
       `<a href="${href}" ${title ? 'title="' + title + '"' : ""} data-sveltekit-reload>${text}</a>`;
@@ -39,6 +37,8 @@
     marked.setOptions({
       renderer: renderer,
     });
+    marked.use(gfmHeadingId({ prefix: "heading-" }));
+
     content = await marked(data.content);
     headings = getHeadingList();
 
