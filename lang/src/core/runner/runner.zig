@@ -7,6 +7,7 @@ const Identifier = @import("../parser/parser.zig").expressions.Identifier;
 const Call = @import("../parser/parser.zig").expressions.Call;
 
 const StdFunction = *const fn (Runner, []*Expression) anyerror!Expression;
+const Module = @import("modules/mod.zig").Module;
 
 const stdlib = @import("stdlib.zig");
 
@@ -20,7 +21,7 @@ const run_file = @import("../full_run.zig").run_file;
 const WEIGHT_ARRAY = [_]u8{ 1, 1, 1, 1, 1, 2, 2, 2, 3 };
 const WEIGHT_LENGTH = WEIGHT_ARRAY.len;
 
-var std_functions = std.StaticStringMap(StdFunction).initComptime(.{
+const std_functions = std.StaticStringMap(StdFunction).initComptime(.{
     .{ "scream", stdlib.scream },
     .{ "abs", stdlib.abs },
     .{ "min", stdlib.min },
@@ -42,12 +43,49 @@ var std_functions = std.StaticStringMap(StdFunction).initComptime(.{
     .{ "cos", stdlib.cos },
 });
 
+const std_modules = std.StaticStringMap(Module).initComptime(.{
+    .{ "socket", @import("modules/socket.zig").Socket },
+});
+
+pub fn require(
+    arg_count: usize,
+    dtypes: []const []const std.meta.Tag(Literal),
+    func_name: []const u8,
+    runner: Runner,
+    arguments: []*Expression,
+) anyerror!void {
+    if (arguments.len != arg_count) {
+        try runner.stderr.print("{s}() requires exactly {} argument(s), got {}\n", .{ func_name, arg_count, arguments.len });
+        std.process.exit(1);
+    }
+
+    for (arguments, 0..) |arg, i| {
+        for (dtypes[i]) |dtype| {
+            if (arg.literal == dtype) {
+                break;
+            }
+        } else {
+            try runner.stderr.print("Argument {} of {s} must be one of: \n", .{
+                i + 1,
+                func_name,
+            });
+            for (dtypes[i]) |dtype| {
+                try runner.stderr.print("  - {s}\n", .{@tagName(dtype)});
+            }
+            std.process.exit(1);
+        }
+    }
+}
+
+pub const Handler = *const fn (runner: Runner, args: []*Expression) anyerror!Expression;
+
 pub const Runner = struct {
     allocator: std.mem.Allocator,
     stdout: std.io.AnyWriter,
     stderr: std.io.AnyWriter,
 
     variables: *std.StringHashMap(*Expression),
+    zig_functions: *std.StringHashMap(Handler),
     functions: *std.StringHashMap(Statement),
     statements: []*Statement,
 
@@ -70,6 +108,9 @@ pub const Runner = struct {
         const variables = try allocator.create(std.StringHashMap(*Expression));
         variables.* = std.StringHashMap(*Expression).init(allocator);
 
+        const zig_functions = try allocator.create(std.StringHashMap(Handler));
+        zig_functions.* = std.StringHashMap(Handler).init(allocator);
+
         const functions = try allocator.create(std.StringHashMap(Statement));
         functions.* = std.StringHashMap(Statement).init(allocator);
 
@@ -86,6 +127,7 @@ pub const Runner = struct {
             .allocator = allocator,
 
             .variables = variables,
+            .zig_functions = zig_functions,
             .functions = functions,
             .statements = statements,
 
@@ -208,35 +250,48 @@ pub const Runner = struct {
                                 const dirname = std.fs.path.dirname(try std.fs.cwd().realpathAlloc(self.allocator, self.location)) orelse ".";
                                 const import_target = directive.arguments.?.items[0];
 
-                                var imported_file = try self.allocator.alloc(u8, dirname.len + import_target.len + 1); // self.location.dirname().?; // directive.arguments.?.items[0];
-
-                                @memcpy(imported_file[0..dirname.len], dirname);
-                                @memcpy(imported_file[dirname.len .. dirname.len + 1], "/");
-                                @memcpy(imported_file[dirname.len + 1 ..], import_target);
-
-                                var sub_runner: Runner = undefined;
-
-                                if (!std.mem.eql(u8, imported_file[imported_file.len - 3 .. imported_file.len], ".??")) {
-                                    var target_file = try self.allocator.alloc(u8, imported_file.len + "/huh.??".len);
-
-                                    @memcpy(target_file[0..imported_file.len], imported_file);
-                                    @memcpy(target_file[imported_file.len..], "/huh.??");
-
-                                    imported_file = target_file;
-                                }
-
-                                sub_runner = try run_file(self.allocator, imported_file);
-                                var export_iterator = sub_runner.exports.iterator();
-
-                                while (export_iterator.next()) |exported| {
-                                    if (self.exports.get(exported.key_ptr.*) != null) {
-                                        try self.stderr.print(
-                                            "Export '{s}' already exists, cannot import again\n",
-                                            .{exported.key_ptr.*},
-                                        );
-                                        std.process.exit(1);
+                                if (std_modules.get(import_target)) |mod| {
+                                    for (mod.functions.kvs.keys, 0..mod.functions.kvs.len) |key, _| {
+                                        try self.zig_functions.put(try std.mem.join(self.allocator, "_", &.{ mod.name, key }), mod.functions.get(key).?);
                                     }
-                                    try self.functions.put(exported.key_ptr.*, exported.value_ptr.*);
+
+                                    for (mod.constants.kvs.keys, 0..mod.constants.kvs.len) |key, _| {
+                                        const value = mod.constants.get(key).?;
+                                        const expr = try self.allocator.create(Expression);
+                                        expr.* = value;
+                                        try self.variables.put(try std.mem.join(self.allocator, "_", &.{ mod.name, key }), expr);
+                                    }
+                                } else {
+                                    var imported_file = try self.allocator.alloc(u8, dirname.len + import_target.len + 1); // self.location.dirname().?; // directive.arguments.?.items[0];
+
+                                    @memcpy(imported_file[0..dirname.len], dirname);
+                                    @memcpy(imported_file[dirname.len .. dirname.len + 1], "/");
+                                    @memcpy(imported_file[dirname.len + 1 ..], import_target);
+
+                                    var sub_runner: Runner = undefined;
+
+                                    if (!std.mem.eql(u8, imported_file[imported_file.len - 3 .. imported_file.len], ".??")) {
+                                        var target_file = try self.allocator.alloc(u8, imported_file.len + "/huh.??".len);
+
+                                        @memcpy(target_file[0..imported_file.len], imported_file);
+                                        @memcpy(target_file[imported_file.len..], "/huh.??");
+
+                                        imported_file = target_file;
+                                    }
+
+                                    sub_runner = try run_file(self.allocator, imported_file);
+                                    var export_iterator = sub_runner.exports.iterator();
+
+                                    while (export_iterator.next()) |exported| {
+                                        if (self.exports.get(exported.key_ptr.*) != null) {
+                                            try self.stderr.print(
+                                                "Export '{s}' already exists, cannot import again\n",
+                                                .{exported.key_ptr.*},
+                                            );
+                                            std.process.exit(1);
+                                        }
+                                        try self.functions.put(exported.key_ptr.*, exported.value_ptr.*);
+                                    }
                                 }
                             } else {
                                 try self.stderr.print("Unknown directive: {s}\n", .{target});
@@ -330,6 +385,8 @@ pub const Runner = struct {
             .identifier => |id| {
                 if (variables.get(id.name)) |value| {
                     return value.*;
+                } else if (self.zig_functions.get(id.name) != null) {
+                    return expr;
                 } else if (std_functions.get(id.name) != null) {
                     return expr;
                 } else if (self.functions.get(id.name) != null) {
@@ -483,6 +540,8 @@ pub const Runner = struct {
 
                 if (std_functions.get(id.name)) |func| {
                     return try func(self, arguments.items);
+                } else if (self.zig_functions.get(id.name)) |func_stmt| {
+                    return try func_stmt(self, arguments.items);
                 } else if (self.functions.get(id.name)) |func_stmt| {
                     return try self.run_function(func_stmt, arguments.items);
                 } else {

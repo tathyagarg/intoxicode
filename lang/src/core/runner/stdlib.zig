@@ -4,42 +4,14 @@ const Runner = @import("runner.zig").Runner;
 const Expression = @import("../parser/parser.zig").expressions.Expression;
 const Literal = @import("../parser/parser.zig").expressions.Literal;
 
-fn require(
-    arg_count: usize,
-    dtypes: []const []const std.meta.Tag(Literal),
-    func_name: []const u8,
-    self: Runner,
-    arguments: []*Expression,
-) anyerror!void {
-    if (arguments.len != arg_count) {
-        try self.stderr.print("{s}() requires exactly {} argument(s), got {}\n", .{ func_name, arg_count, arguments.len });
-        std.process.exit(1);
-    }
+const require = @import("runner.zig").require;
 
-    for (arguments, 0..) |arg, i| {
-        for (dtypes[i]) |dtype| {
-            if (arg.literal == dtype) {
-                break;
-            }
-        } else {
-            try self.stderr.print("Argument {} of {s} must be one of: \n", .{
-                i + 1,
-                func_name,
-            });
-            for (dtypes[i]) |dtype| {
-                try self.stderr.print("  - {s}\n", .{@tagName(dtype)});
-            }
-            std.process.exit(1);
-        }
-    }
-}
-
-pub fn scream(self: Runner, args: []*Expression) anyerror!Expression {
-    var output = std.ArrayList(u8).init(self.allocator);
+pub fn scream(runner: Runner, args: []*Expression) anyerror!Expression {
+    var output = std.ArrayList(u8).init(runner.allocator);
     for (args) |arg| {
-        try output.appendSlice(try arg.literal.to_string(self.allocator, self));
+        try output.appendSlice(try arg.literal.to_string(runner.allocator, runner));
     }
-    try self.stdout.writeAll(output.items);
+    try runner.stdout.writeAll(output.items);
 
     return Expression{
         .literal = Literal{
@@ -48,8 +20,8 @@ pub fn scream(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn abs(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(1, &.{&.{.number}}, "abs", self, args);
+pub fn abs(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{.number}}, "abs", runner, args);
 
     const arg = args[0];
     if (arg.literal.number < 0) {
@@ -63,9 +35,9 @@ pub fn abs(self: Runner, args: []*Expression) anyerror!Expression {
     }
 }
 
-pub fn min(self: Runner, args: []*Expression) anyerror!Expression {
+pub fn min(runner: Runner, args: []*Expression) anyerror!Expression {
     if (args.len == 0) {
-        try self.stderr.print("min() requires at least one argument, got {}\n", .{args.len});
+        try runner.stderr.print("min() requires at least one argument, got {}\n", .{args.len});
         std.process.exit(1);
     }
 
@@ -83,9 +55,9 @@ pub fn min(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn max(self: Runner, args: []*Expression) anyerror!Expression {
+pub fn max(runner: Runner, args: []*Expression) anyerror!Expression {
     if (args.len == 0) {
-        try self.stderr.print("max() requires at least one argument, got {}\n", .{args.len});
+        try runner.stderr.print("max() requires at least one argument, got {}\n", .{args.len});
         std.process.exit(1);
     }
 
@@ -103,8 +75,8 @@ pub fn max(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn pow(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(2, &.{ &.{.number}, &.{.number} }, "pow", self, args);
+pub fn pow(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(2, &.{ &.{.number}, &.{.number} }, "pow", runner, args);
 
     const base = args[0].literal.number;
     const exponent = args[1].literal.number;
@@ -116,12 +88,12 @@ pub fn pow(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn sqrt(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(1, &.{&.{.number}}, "sqrt", self, args);
+pub fn sqrt(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{.number}}, "sqrt", runner, args);
 
     const value = args[0].literal.number;
     if (value < 0) {
-        try self.stderr.print("sqrt() cannot take a negative number, got {}\n", .{value});
+        try runner.stderr.print("sqrt() cannot take a negative number, got {}\n", .{value});
         std.process.exit(1);
     }
 
@@ -132,8 +104,8 @@ pub fn sqrt(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn length(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(1, &.{&.{ .string, .array }}, "length", self, args);
+pub fn length(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{ .string, .array }}, "length", runner, args);
 
     const arg = args[0];
     return switch (arg.literal) {
@@ -151,19 +123,19 @@ pub fn length(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn to_string(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(1, &.{&.{ .null, .boolean, .number, .string, .array }}, "to_string", self, args);
+pub fn to_string(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{ .null, .boolean, .number, .string, .array }}, "to_string", runner, args);
 
     const arg = args[0];
     return Expression{
         .literal = Literal{
-            .string = try arg.literal.to_string(self.allocator, self),
+            .string = try arg.literal.to_string(runner.allocator, runner),
         },
     };
 }
 
-pub fn to_number(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(1, &.{&.{ .null, .boolean, .string, .number }}, "to_number", self, args);
+pub fn to_number(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{ .null, .boolean, .string, .number }}, "to_number", runner, args);
 
     const arg = args[0];
 
@@ -180,7 +152,7 @@ pub fn to_number(self: Runner, args: []*Expression) anyerror!Expression {
         },
         .string => |str| {
             const parsed = std.fmt.parseFloat(f32, str) catch |err| {
-                try self.stderr.print("to_number() could not parse string '{s}': {}\n", .{ str, err });
+                try runner.stderr.print("to_number() could not parse string '{s}': {}\n", .{ str, err });
                 std.process.exit(1);
             };
 
@@ -191,7 +163,7 @@ pub fn to_number(self: Runner, args: []*Expression) anyerror!Expression {
             };
         },
         .array => {
-            try self.stderr.print("to_number() cannot convert array to number\n", .{});
+            try runner.stderr.print("to_number() cannot convert array to number\n", .{});
             std.process.exit(1);
         },
         .number => |num| Expression{
@@ -202,8 +174,8 @@ pub fn to_number(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn is_digit(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(1, &.{&.{.string}}, "is_digit", self, args);
+pub fn is_digit(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{.string}}, "is_digit", runner, args);
 
     const str = args[0].literal.string;
 
@@ -220,16 +192,16 @@ pub fn is_digit(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn chr(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(1, &.{&.{.number}}, "chr", self, args);
+pub fn chr(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{.number}}, "chr", runner, args);
 
     const codepoint: u21 = @intFromFloat(args[0].literal.number);
     if (codepoint > 0x10FFFF) {
-        try self.stderr.print("chr() codepoint out of range: {}\n", .{codepoint});
+        try runner.stderr.print("chr() codepoint out of range: {}\n", .{codepoint});
         std.process.exit(1);
     }
 
-    const buffer = try self.allocator.alloc(u8, 1);
+    const buffer = try runner.allocator.alloc(u8, 1);
     _ = try std.unicode.utf8Encode(codepoint, buffer);
 
     return Expression{
@@ -239,8 +211,8 @@ pub fn chr(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn append(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(2, &.{ &.{.array}, &.{ .null, .boolean, .number, .string, .array } }, "append", self, args);
+pub fn append(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(2, &.{ &.{.array}, &.{ .null, .boolean, .number, .string, .array } }, "append", runner, args);
 
     const array_expr = args[0];
     const value_expr = args[1];
@@ -249,7 +221,7 @@ pub fn append(self: Runner, args: []*Expression) anyerror!Expression {
     const value = value_expr;
 
     array.append(value.*) catch |err| {
-        try self.stderr.print("append() failed to append value: {}\n", .{err});
+        try runner.stderr.print("append() failed to append value: {}\n", .{err});
         std.process.exit(1);
     };
 
@@ -262,8 +234,8 @@ pub fn append(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn insert(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(3, &.{ &.{.array}, &.{.number}, &.{ .null, .boolean, .number, .string, .array } }, "insert", self, args);
+pub fn insert(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(3, &.{ &.{.array}, &.{.number}, &.{ .null, .boolean, .number, .string, .array } }, "insert", runner, args);
 
     const array_expr = args[0];
 
@@ -272,12 +244,12 @@ pub fn insert(self: Runner, args: []*Expression) anyerror!Expression {
     const value = args[2];
 
     if (index < 0 or index > array.items.len) {
-        try self.stderr.print("insert() index out of bounds: {}\n", .{index});
+        try runner.stderr.print("insert() index out of bounds: {}\n", .{index});
         std.process.exit(1);
     }
 
     array.insert(index, value.*) catch |err| {
-        try self.stderr.print("insert() failed to insert value: {}\n", .{err});
+        try runner.stderr.print("insert() failed to insert value: {}\n", .{err});
         std.process.exit(1);
     };
 
@@ -290,8 +262,8 @@ pub fn insert(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn remove(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(2, &.{ &.{.array}, &.{.number} }, "remove", self, args);
+pub fn remove(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(2, &.{ &.{.array}, &.{.number} }, "remove", runner, args);
 
     const array_expr = args[0];
 
@@ -299,7 +271,7 @@ pub fn remove(self: Runner, args: []*Expression) anyerror!Expression {
     const index: usize = @intFromFloat(args[1].literal.number);
 
     if (index < 0 or index >= array.items.len) {
-        try self.stderr.print("remove() index out of bounds: {}\n", .{index});
+        try runner.stderr.print("remove() index out of bounds: {}\n", .{index});
         std.process.exit(1);
     }
 
@@ -314,8 +286,8 @@ pub fn remove(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn find_first(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(2, &.{ &.{.array}, &.{ .null, .boolean, .number, .string, .array } }, "find_first", self, args);
+pub fn find_first(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(2, &.{ &.{.array}, &.{ .null, .boolean, .number, .string, .array } }, "find_first", runner, args);
 
     const array_expr = args[0];
 
@@ -323,7 +295,7 @@ pub fn find_first(self: Runner, args: []*Expression) anyerror!Expression {
     const value = args[1];
 
     for (array.items, 0..) |item, index| {
-        if (try value.equals(item, self)) {
+        if (try value.equals(item, runner)) {
             return Expression{
                 .literal = Literal{
                     .number = @floatFromInt(index),
@@ -339,8 +311,8 @@ pub fn find_first(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn find_last(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(2, &.{ &.{.array}, &.{ .null, .boolean, .number, .string, .array } }, "find_last", self, args);
+pub fn find_last(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(2, &.{ &.{.array}, &.{ .null, .boolean, .number, .string, .array } }, "find_last", runner, args);
 
     const array_expr = args[0];
 
@@ -348,7 +320,7 @@ pub fn find_last(self: Runner, args: []*Expression) anyerror!Expression {
     const value = args[1];
 
     for (array.items, (array.items.len - 1)..) |item, index| {
-        if (try value.equals(item, self)) {
+        if (try value.equals(item, runner)) {
             return Expression{
                 .literal = Literal{
                     .number = @floatFromInt(index),
@@ -364,8 +336,8 @@ pub fn find_last(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn update(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(3, &.{ &.{.array}, &.{.number}, &.{ .null, .boolean, .number, .string, .array } }, "update", self, args);
+pub fn update(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(3, &.{ &.{.array}, &.{.number}, &.{ .null, .boolean, .number, .string, .array } }, "update", runner, args);
 
     const array_expr = args[0];
 
@@ -374,7 +346,7 @@ pub fn update(self: Runner, args: []*Expression) anyerror!Expression {
     const value = args[2];
 
     if (index < 0 or index >= array.items.len) {
-        try self.stderr.print("update() index out of bounds: {}\n", .{index});
+        try runner.stderr.print("update() index out of bounds: {}\n", .{index});
         std.process.exit(1);
     }
 
@@ -391,8 +363,8 @@ pub fn update(self: Runner, args: []*Expression) anyerror!Expression {
 
 // zig std lib wrappers
 
-pub fn sin(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(1, &.{&.{.number}}, "sin", self, args);
+pub fn sin(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{.number}}, "sin", runner, args);
 
     return Expression{
         .literal = Literal{
@@ -401,8 +373,8 @@ pub fn sin(self: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
-pub fn cos(self: Runner, args: []*Expression) anyerror!Expression {
-    try require(1, &.{&.{.number}}, "cos", self, args);
+pub fn cos(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{.number}}, "cos", runner, args);
 
     return Expression{
         .literal = Literal{
