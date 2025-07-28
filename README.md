@@ -4,15 +4,9 @@
 
   [Intoxicode](https://intoxicode.arson.dev) is an [esolang](https://esolangs.org/wiki/Main_Page) that simulates a drunken program with uncertain behavior.
 
-  <a href="https://intoxicode.arson.dev/docs">
-    <img src="https://img.shields.io/static/v1?label=Docs&message=intoxicode.arson.dev/docs&color=F9AD6F">
-  </a>
-  <a href="https://github.com/tathyagarg/intoxicode/releases">
-    <img src="https://shields.io/github/v/tag/tathyagarg/intoxicode?label=version&color=orange">
-  </a>
-  <a href="https://github.com/tathyagarg/intoxicode/blob/main/LICENSE">
-    <img src="https://img.shields.io/github/license/tathyagarg/intoxicode?color=red">
-  </a>
+  <a href="https://intoxicode.arson.dev/docs"><img src="https://img.shields.io/static/v1?label=Docs&message=intoxicode.arson.dev/docs&color=F9AD6F"></a>
+  <a href="https://github.com/tathyagarg/intoxicode/releases"><img src="https://shields.io/github/v/tag/tathyagarg/intoxicode?label=version&color=orange"></a>
+  <a href="https://github.com/tathyagarg/intoxicode/blob/main/LICENSE"><img src="https://img.shields.io/github/license/tathyagarg/intoxicode?color=red"></a>
 </div>
 
 ## Features
