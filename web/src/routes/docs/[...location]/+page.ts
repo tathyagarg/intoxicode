@@ -1,13 +1,15 @@
 import paths from "$lib/docs/paths";
 
 export const load = async ({ params }) => {
-  const { location } = params;
+  let { location } = params;
 
   if (!paths[location]) {
     return { content: "Document not found." };
   }
 
   try {
+    console.log('loading', location)
+
     const mod = await import(`$lib/docs/files/${location}.md?raw`);
     return {
       content: mod.default,

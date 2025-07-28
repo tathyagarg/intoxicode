@@ -71,6 +71,17 @@ const paths: Record<string, Path> = {
     name: 'Imports',
     level: 2,
     prev: 'directives',
+    next: 'stdlib',
+  },
+  'stdlib': {
+    name: 'Standard Library',
+    prev: 'imports',
+    next: 'fs'
+  },
+  'fs': {
+    name: 'fs',
+    level: 2,
+    prev: 'stdlib',
   }
 }
 
