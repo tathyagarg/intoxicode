@@ -3,6 +3,9 @@ const Token = @import("../lexer/tokens.zig").Token;
 const Runner = @import("../runner/runner.zig").Runner;
 const Module = @import("../runner/modules/mod.zig").Module;
 
+const FunctionDeclaration = @import("statement.zig").FunctionDeclaration;
+const Handler = @import("../runner/runner.zig").Handler;
+
 pub const Expression = union(enum) {
     binary: Binary,
     grouping: Grouping,
@@ -42,6 +45,7 @@ pub const Expression = union(enum) {
                             return true;
                         },
                         .module => |mod| std.mem.eql(u8, l.module.name, mod.name),
+                        .function => false,
                     };
                 },
                 else => false,
@@ -129,6 +133,7 @@ pub const Expression = union(enum) {
                     const module_name = mod.name;
                     return try std.fmt.allocPrint(allocator, "Literal(module = {s})", .{module_name});
                 },
+                .function => |f| try std.fmt.allocPrint(allocator, "Function({s})", .{f.name}),
             },
             .identifier => self.identifier.pretty_print(allocator),
             .call => |c| {
@@ -206,6 +211,7 @@ pub const Literal = union(enum) {
     boolean: bool,
     null: ?void,
     array: std.ArrayList(Expression),
+    function: Function,
     module: Module,
 
     pub fn number_from_string(s: []const u8) !Literal {
@@ -261,8 +267,17 @@ pub const Literal = union(enum) {
             .module => |mod| {
                 return try std.fmt.allocPrint(allocator, "Module({s})", .{mod.name});
             },
+            .function => |f| f.name,
         };
     }
+};
+
+pub const Function = struct {
+    name: []const u8,
+    handler: union(enum) {
+        intox: FunctionDeclaration,
+        native: Handler,
+    },
 };
 
 pub const Identifier = struct {

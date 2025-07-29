@@ -1,11 +1,11 @@
 @all
 @import("fs")
 
-handle = (fs ~ open)("syntax.md", (fs ~ READ) + (fs ~ WRITE))
+handle = fs ~ open("syntax.md", fs ~ READ + fs ~ WRITE)
 content_buffer = ""
 
-_ = (fs ~ seek_to)(handle, 19)
-_ = (fs ~ seek_by)(handle, 25)
-size = (fs ~ read)(handle, content_buffer, 56)
+fs ~ seek_to(handle, 19)
+fs ~ seek_by(handle, 25)
+fs ~ read(handle, content_buffer, 56)
 
 scream(content_buffer)

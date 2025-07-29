@@ -253,6 +253,7 @@ pub const Parser = struct {
             return stmt;
         }
 
+        self.current -= 1;
         return self.expression_statement();
     }
 
@@ -411,7 +412,7 @@ pub const Parser = struct {
         return stmt;
     }
 
-    fn expression(self: *Parser) error{ OutOfMemory, InvalidCharacter }!Expression {
+    fn expression(self: *Parser) anyerror!Expression {
         return try self.logical();
     }
 
@@ -464,13 +465,13 @@ pub const Parser = struct {
     }
 
     fn comparison(self: *Parser) !Expression {
-        var expr = try self.attribute();
+        var expr = try self.term();
 
         while (self.match((&[_]TokenType{ .GreaterThan, .LessThan })[0..])) {
             const operator = self.previous();
 
             const right = try self.allocator.create(Expression);
-            right.* = try self.attribute();
+            right.* = try self.term();
 
             const left = try self.allocator.create(Expression);
             left.* = expr;
@@ -480,27 +481,6 @@ pub const Parser = struct {
                     .left = left,
                     .operator = operator,
                     .right = right,
-                },
-            };
-        }
-
-        return expr;
-    }
-
-    fn attribute(self: *Parser) !Expression {
-        var expr = try self.term();
-
-        if (self.match(&[_]TokenType{.GetAttribute})) {
-            const right = try self.allocator.create(Expression);
-            right.* = try self.term();
-
-            const left = try self.allocator.create(Expression);
-            left.* = expr;
-
-            expr = Expression{
-                .get_attribute = expressions.GetAttribute{
-                    .object = left,
-                    .attribute = right,
                 },
             };
         }
@@ -582,7 +562,7 @@ pub const Parser = struct {
     }
 
     fn call(self: *Parser) !Expression {
-        var expr = try self.primary();
+        var expr = try self.attribute();
 
         while (self.match(&[_]TokenType{.LeftParen})) {
             const args = try self.allocator.create(std.ArrayList(Expression));
@@ -604,6 +584,27 @@ pub const Parser = struct {
                 .call = expressions.Call{
                     .callee = callee,
                     .arguments = args.*,
+                },
+            };
+        }
+
+        return expr;
+    }
+
+    fn attribute(self: *Parser) !Expression {
+        var expr = try self.primary();
+
+        if (self.match(&[_]TokenType{.GetAttribute})) {
+            const right = try self.allocator.create(Expression);
+            right.* = try self.primary();
+
+            const left = try self.allocator.create(Expression);
+            left.* = expr;
+
+            expr = Expression{
+                .get_attribute = expressions.GetAttribute{
+                    .object = left,
+                    .attribute = right,
                 },
             };
         }

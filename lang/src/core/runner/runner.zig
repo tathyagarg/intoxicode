@@ -521,11 +521,15 @@ pub const Runner = struct {
 
                 if (module.constants.get(attribute.name)) |value| {
                     return value;
-                } else if (module.functions.get(attribute.name) != null) {
+                } else if (module.functions.get(attribute.name)) |handler| {
                     return Expression{
-                        .get_attribute = .{
-                            .object = ga.object,
-                            .attribute = ga.attribute,
+                        .literal = .{
+                            .function = .{
+                                .name = attribute.name,
+                                .handler = .{
+                                    .native = handler,
+                                },
+                            },
                         },
                     };
                 } else {
@@ -572,11 +576,12 @@ pub const Runner = struct {
         }
 
         switch (callee) {
-            .literal => {
-                return Expression{
-                    .literal = Literal{
-                        .null = null,
-                    },
+            .literal => |l| {
+                if (l != .function) return Expression{ .literal = .{ .null = null } };
+
+                return switch (l.function.handler) {
+                    .intox => |i| try self.run_function(Statement{ .function_declaration = i }, arguments.items),
+                    .native => |native| try native(self, arguments.items),
                 };
             },
             .identifier => |id| {
