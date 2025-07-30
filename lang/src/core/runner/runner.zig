@@ -33,6 +33,7 @@ const std_functions = std.StaticStringMap(StdFunction).initComptime(.{
     .{ "to_number", stdlib.to_number },
     .{ "is_digit", stdlib.is_digit },
     .{ "chr", stdlib.chr },
+    .{ "ord", stdlib.ord },
     .{ "append", stdlib.append },
     .{ "insert", stdlib.insert },
     .{ "remove", stdlib.remove },
@@ -46,6 +47,7 @@ const std_functions = std.StaticStringMap(StdFunction).initComptime(.{
 const std_modules = std.StaticStringMap(Module).initComptime(.{
     .{ "socket", @import("modules/socket.zig").Socket },
     .{ "fs", @import("modules/fs.zig").Fs },
+    .{ "http", @import("modules/http.zig").Http },
 });
 
 pub fn require(
@@ -376,19 +378,33 @@ pub const Runner = struct {
                 const array_expr = try self.evaluate_expression(indexing.array.*, variables);
                 const index_expr = try self.evaluate_expression(indexing.index.*, variables);
 
-                const array = array_expr.literal.array;
                 const index = @as(usize, @intFromFloat(index_expr.literal.number));
-
-                if (index < array.items.len) {
-                    return Expression{
-                        .literal = array.items[index].literal,
-                    };
-                } else {
-                    try self.stderr.print("Index out of bounds: {d} for array of length {d}\n", .{
-                        index,
-                        array.items.len,
-                    });
-                    std.process.exit(1);
+                switch (array_expr.literal) {
+                    .array => |a| {
+                        if (index < a.items.len) {
+                            return Expression{
+                                .literal = a.items[index].literal,
+                            };
+                        } else {
+                            try self.stderr.print("Index out of bounds: {d} for array of length {d}\n", .{
+                                index,
+                                a.items.len,
+                            });
+                            std.process.exit(1);
+                        }
+                    },
+                    .string => |s| {
+                        if (index < s.len) {
+                            return Expression{ .literal = .{ .number = @floatFromInt(s[index]) } };
+                        } else {
+                            try self.stderr.print("Index out of bounds: {d} for string of length {d}\n", .{
+                                index,
+                                s.len,
+                            });
+                            std.process.exit(1);
+                        }
+                    },
+                    else => unreachable,
                 }
             },
             .identifier => |id| {

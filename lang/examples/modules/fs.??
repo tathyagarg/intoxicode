@@ -6,6 +6,11 @@ content_buffer = ""
 
 fs ~ seek_to(handle, 19)
 fs ~ seek_by(handle, 25)
-fs ~ read(handle, content_buffer, 56)
+
+fs ~ write(handle, "meow")
+
+fs ~ seek_to(handle, 0)
+
+fs ~ read(handle, content_buffer, 100)
 
 scream(content_buffer)

@@ -68,8 +68,6 @@ pub fn read(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(3, &.{ &.{.number}, &.{.string}, &.{.number} }, "read", runner, args);
 
     const handle: c_int = @intFromFloat(args[0].literal.number);
-    // const buffer: []u8 = args[1].literal.string;
-
     const buffer_size: usize = @intFromFloat(args[2].literal.number);
 
     var buffer: []u8 = try runner.allocator.alloc(u8, buffer_size);
@@ -107,6 +105,63 @@ pub fn seek_by(runner: Runner, args: []*Expression) anyerror!Expression {
     return Expression{ .literal = .{ .null = null } };
 }
 
+pub fn write(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(2, &.{ &.{.number}, &.{.string} }, "write", runner, args);
+
+    const handle: c_int = @intFromFloat(args[0].literal.number);
+    const data: []const u8 = args[1].literal.string;
+
+    const size = switch (native_os) {
+        .windows => try std.os.windows.WriteFile(handle, data, null),
+        .macos, .linux => try std.posix.write(handle, data),
+        else => return error.UnsupportedOS,
+    };
+
+    return Expression{ .literal = .{ .number = @floatFromInt(size) } };
+}
+
+pub fn close(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{.number}}, "close", runner, args);
+
+    const handle: c_int = @intFromFloat(args[0].literal.number);
+
+    switch (native_os) {
+        .windows => std.os.windows.CloseHandle(handle),
+        .macos, .linux => std.posix.close(handle),
+        else => return error.UnsupportedOS,
+    }
+
+    return Expression{ .literal = .{ .null = null } };
+}
+
+pub fn read_to_zero(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(2, &.{ &.{.number}, &.{.string} }, "read_to_zero", runner, args);
+
+    const handle: c_int = @intFromFloat(args[0].literal.number);
+
+    var buffer: [1]u8 = undefined;
+    var res = std.ArrayList(u8).init(runner.allocator);
+
+    while (buffer[0] != 0) {
+        _ = switch (native_os) {
+            .windows => std.os.windows.ReadFile(handle, buffer[0..], null),
+            .macos, .linux => try std.posix.read(handle, buffer[0..]),
+            else => return error.UnsupportedOS,
+        };
+
+        if (buffer[0] == 0) {
+            break;
+        }
+
+        try res.appendSlice(&buffer);
+    }
+
+    const string = try res.toOwnedSlice();
+    args[1].* = Expression{ .literal = .{ .string = string } };
+
+    return Expression{ .literal = .{ .null = null } };
+}
+
 pub const Fs = Module{
     .name = "fs",
     .functions = std.StaticStringMap(Handler).initComptime(.{
@@ -115,6 +170,9 @@ pub const Fs = Module{
         .{ "pread", &pread },
         .{ "seek_to", &seek_to },
         .{ "seek_by", &seek_by },
+        .{ "write", &write },
+        .{ "close", &close },
+        .{ "read_to_zero", &read_to_zero },
     }),
     .constants = std.StaticStringMap(Expression).initComptime(.{
         .{ "READ", Expression{ .literal = .{ .number = @floatFromInt(READ) } } },

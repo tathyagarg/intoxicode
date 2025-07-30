@@ -211,6 +211,18 @@ pub fn chr(runner: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
+pub fn ord(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{.string}}, "ord", runner, args);
+
+    const string = args[0].literal.string;
+    if (string.len > 1) {
+        return error.StringNotChar;
+    }
+
+    const char = string[0];
+    return Expression{ .literal = .{ .number = @floatFromInt(char) } };
+}
+
 pub fn append(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(2, &.{ &.{.array}, &.{ .null, .boolean, .number, .string, .array } }, "append", runner, args);
 

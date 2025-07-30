@@ -7,6 +7,8 @@ const require = @import("../runner.zig").require;
 const Module = @import("mod.zig").Module;
 const Handler = @import("../runner.zig").Handler;
 
+const fs = @import("fs.zig");
+
 const native_os = @import("builtin").os.tag;
 
 fn string_to_u8(s: []const u8) u8 {
@@ -117,11 +119,90 @@ pub fn connect(runner: Runner, args: []*Expression) anyerror!Expression {
     };
 }
 
+pub fn bind(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(3, &.{ &.{.number}, &.{.string}, &.{.number} }, "bind", runner, args);
+
+    const sockfd: c_int = @intFromFloat(args[0].literal.number);
+    const address_raw: []const u8 = args[1].literal.string;
+    const port_raw: u16 = @intFromFloat(args[2].literal.number);
+
+    const port: [2]u8 = [_]u8{
+        @as(u8, @intCast(port_raw >> 8)),
+        @as(u8, @intCast(port_raw & 0xFF)),
+    };
+
+    var parts_raw = std.mem.split(u8, address_raw, ".");
+    var address: [4]u8 = undefined;
+
+    var i: usize = 0;
+
+    while (parts_raw.next()) |part| : (i += 1) {
+        const part_value = string_to_u8(part);
+        address[i] = part_value;
+    }
+
+    const sockaddr_in = switch (native_os) {
+        .macos => std.posix.sockaddr{
+            .len = @sizeOf(std.posix.sockaddr.in),
+            .family = std.c.AF.INET,
+            .data = port ++ address ++ [8]u8{ 0, 0, 0, 0, 0, 0, 0, 0 },
+        },
+        .linux => std.posix.sockaddr{
+            .family = std.c.AF.INET,
+            .data = port ++ address ++ [8]u8{ 0, 0, 0, 0, 0, 0, 0, 0 },
+        },
+        .windows => std.os.windows.ws2_32.sockaddr{
+            .family = std.c.AF.INET,
+            .data = port ++ address ++ [8]u8{ 0, 0, 0, 0, 0, 0, 0, 0 },
+        },
+        else => return error.UnsupportedOS,
+    };
+
+    const sockaddr_ptr: *const std.posix.sockaddr = @ptrCast(&sockaddr_in);
+    _ = .{sockaddr_ptr};
+
+    try std.posix.bind(sockfd, sockaddr_ptr, @sizeOf(std.posix.sockaddr.in));
+
+    return Expression{
+        .literal = .{
+            .number = @floatFromInt(0), // Return 0 on success
+        },
+    };
+}
+
+pub fn listen(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(2, &.{ &.{.number}, &.{.number} }, "listen", runner, args);
+
+    const sockfd: c_int = @intFromFloat(args[0].literal.number);
+    const backlog: u31 = @intFromFloat(args[1].literal.number);
+
+    try std.posix.listen(sockfd, backlog);
+
+    return Expression{ .literal = .{ .null = null } };
+}
+
+pub fn accept(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(4, &.{ &.{.number}, &.{.string}, &.{.number}, &.{.number} }, "accept", runner, args);
+
+    const sockfd: c_int = @intFromFloat(args[0].literal.number);
+
+    var sockaddr: std.c.sockaddr = undefined;
+    var socklen: u32 = undefined;
+
+    const client_fd = try std.posix.accept(sockfd, &sockaddr, &socklen, 0);
+
+    return Expression{ .literal = .{ .number = @floatFromInt(client_fd) } };
+}
+
 pub const Socket = Module{
     .name = "socket",
     .functions = std.StaticStringMap(Handler).initComptime(.{
         .{ "socket", &socket },
         .{ "connect", &connect },
+        .{ "close", &fs.close },
+        .{ "bind", &bind },
+        .{ "listen", &listen },
+        .{ "accept", &accept },
     }),
     .constants = std.StaticStringMap(Expression).initComptime(.{
         // Address families

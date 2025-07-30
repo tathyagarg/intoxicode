@@ -1,0 +1,17 @@
+@all
+
+fun get_method(text) {
+  method = ""
+  current = 0
+
+  len = length(text)
+
+  loop (current < len and text[current] != ord(" ")) {
+    method = method + chr(text[current])
+    current = current + 1
+  }
+
+  throwaway method
+}
+
+@export(get_method)

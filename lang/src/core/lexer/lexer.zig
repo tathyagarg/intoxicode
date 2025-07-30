@@ -163,7 +163,23 @@ pub const Lexer = struct {
                     return error.UnterminatedString; // Unterminated string literal
                 }
 
-                try self.add_raw_token(Token.init(TokenType.String, self.input[start - 1 .. end - 1]));
+                const content = self.input[start - 1 .. end - 1];
+                const no_lf_size = std.mem.replacementSize(u8, content, "\\n", &[_]u8{10});
+                const no_lf_out = try self.allocator.alloc(u8, no_lf_size);
+
+                _ = std.mem.replace(u8, content, "\\n", &[_]u8{10}, no_lf_out);
+
+                const no_cr_size = std.mem.replacementSize(u8, no_lf_out, "\\r", &[_]u8{13});
+                const no_cr_out = try self.allocator.alloc(u8, no_cr_size);
+
+                _ = std.mem.replace(u8, no_lf_out, "\\r", &[_]u8{13}, no_cr_out);
+
+                const no_zero_size = std.mem.replacementSize(u8, no_cr_out, "\\0", &[_]u8{0});
+                const no_zero_out = try self.allocator.alloc(u8, no_zero_size);
+
+                _ = std.mem.replace(u8, no_cr_out, "\\0", &[_]u8{0}, no_zero_out);
+
+                try self.add_raw_token(Token.init(TokenType.String, no_zero_out));
                 //std.debug.print("String: {s}\n", .{self.tokens.items[self.tokens.items.len - 1].value});
             },
             '0'...'9' => try self.add_token(try self.number()),

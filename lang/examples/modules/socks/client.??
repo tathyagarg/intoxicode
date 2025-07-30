@@ -1,0 +1,17 @@
+@all
+@import("socket")
+@import("fs")
+
+fd = socket ~ socket(socket ~ AF_INET, socket ~ SOCK_STREAM, 0)
+socket ~ connect(fd, "127.0.0.1", 8000)
+
+fs ~ write(fd, "POST /\0")
+
+cb = "_"
+res = ""
+
+fs ~ read_to_zero(fd, res)
+
+scream(res, "\n")
+
+fs ~ close(fd)

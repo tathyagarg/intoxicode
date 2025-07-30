@@ -1,0 +1,24 @@
+@all
+@import("fs")
+@import("socket")
+@import("utils.??")
+
+fun get_root() {
+  throwaway "This is the home page"
+}
+
+fd = socket ~ socket(socket ~ AF_INET, socket ~ SOCK_STREAM, 0)
+socket ~ bind(fd, "127.0.0.1", 8000)
+socket ~ listen(fd, 10)
+scream("Listening\n")
+
+loop (true) {
+  client = socket ~ accept(fd, "", 1, 2)
+
+  client_msg = ""
+  fs ~ read_to_zero(client, client_msg)
+
+  method = get_method(client_msg)
+  scream("Client's method: ", method, "\n")
+}
+scream("Client ", client, "\n")

@@ -1,8 +1,0 @@
-@all
-@import("socket")
-
-fd = (socket ~ socket)(socket ~ AF_INET, socket ~ SOCK_STREAM, 0)
-_ = (socket ~ connect)(fd, "127.0.0.1", 8000)
-
-scream(fd)
-
