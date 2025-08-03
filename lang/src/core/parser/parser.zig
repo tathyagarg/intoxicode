@@ -87,24 +87,26 @@ pub const Parser = struct {
     }
 
     fn statement(self: *Parser) anyerror!*Statement {
-        const found_stmt = if (self.match(&[_]TokenType{.If}))
-            try self.if_statement()
+        const found_stmt = try if (self.match(&[_]TokenType{.If}))
+            self.if_statement()
         else if (self.match(&[_]TokenType{.Loop}))
-            try self.loop_statement()
+            self.loop_statement()
         else if (self.match(&[_]TokenType{.Fun}))
-            try self.function_declaration()
+            self.function_declaration()
         else if (self.match(&[_]TokenType{.Try}))
-            try self.try_statement()
+            self.try_statement()
         else if (self.match(&[_]TokenType{.Throwaway}))
-            try self.throwaway_statement()
+            self.throwaway_statement()
         else if (self.match(&[_]TokenType{.Identifier}))
-            try self.assignment_or_expression()
+            self.assignment_or_expression()
         else if (self.match(&[_]TokenType{.Directive}))
-            try self.directive()
+            self.directive()
         else if (self.match(&[_]TokenType{.Repeat}))
-            try self.repeat()
+            self.repeat()
+        else if (self.match(&[_]TokenType{.Object}))
+            self.object()
         else
-            try self.expression_statement();
+            self.expression_statement();
 
         if (self.certainty_mods.*) {
             const next = self.advance();
@@ -122,6 +124,39 @@ pub const Parser = struct {
         }
 
         return found_stmt;
+    }
+
+    fn object(self: *Parser) !*Statement {
+        const name = try self.consume(.Identifier, "Expected object name after 'object' keyword.");
+
+        _ = try self.consume(.LeftBrace, "Expected '{' to start object definition.");
+
+        var properties = std.StringHashMap(expressions.LiteralType).init(self.allocator);
+
+        while (!self.is_at_end() and !self.check(.RightBrace)) {
+            const key = try self.consume(.Identifier, "Expected property name in object definition.");
+            _ = try self.consume(.Arrow, "Expected '->' after property name.");
+
+            const dtype_raw = try self.consume(.Identifier, "Expected data type after '->' in object property.");
+
+            const dtype = expressions.LiteralTypeMap.get(dtype_raw.value) orelse .custom;
+
+            try properties.put(key.value, dtype);
+
+            if (!self.match(&[_]TokenType{.Comma})) break;
+        }
+
+        _ = try self.consume(.RightBrace, "Expected '}' to end object definition.");
+
+        const stmt = try self.allocator.create(Statement);
+        stmt.* = Statement{
+            .object_statement = statements.ObjectStatement{
+                .name = name.value,
+                .properties = properties,
+            },
+        };
+
+        return stmt;
     }
 
     fn repeat(self: *Parser) !*Statement {
@@ -650,10 +685,42 @@ pub const Parser = struct {
             const token = self.previous();
 
             return switch (token.token_type) {
-                .Identifier => Expression{
-                    .identifier = expressions.Identifier{
-                        .name = token.value,
-                    },
+                .Identifier => {
+                    // object cration
+                    if (self.match(&[_]TokenType{.LeftBrace})) {
+                        const properties = try self.allocator.create(std.StringHashMap(Expression));
+                        properties.* = std.StringHashMap(Expression).init(self.allocator);
+
+                        while (!self.is_at_end() and !self.check(.RightBrace)) {
+                            const key = try self.consume(.Identifier, "Expected property name in object literal.");
+                            _ = try self.consume(.Arrow, "Expected '->' after property name.");
+
+                            const value = try self.expression();
+
+                            try properties.put(key.value, value);
+
+                            if (!self.match(&[_]TokenType{.Comma})) break;
+                        }
+
+                        _ = try self.consume(.RightBrace, "Expected '}' to end object literal.");
+
+                        return Expression{
+                            .literal = expressions.Literal{
+                                .custom = .{
+                                    .corr_type = Identifier{
+                                        .name = token.value,
+                                    },
+                                    .values = properties.*,
+                                },
+                            },
+                        };
+                    }
+
+                    return Expression{
+                        .identifier = expressions.Identifier{
+                            .name = token.value,
+                        },
+                    };
                 },
                 .Integer, .Float => Expression{
                     .literal = try expressions.Literal.number_from_string(token.value),

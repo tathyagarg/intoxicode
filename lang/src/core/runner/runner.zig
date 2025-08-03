@@ -5,6 +5,9 @@ const Expression = @import("../parser/parser.zig").expressions.Expression;
 const Literal = @import("../parser/parser.zig").expressions.Literal;
 const Identifier = @import("../parser/parser.zig").expressions.Identifier;
 const Call = @import("../parser/parser.zig").expressions.Call;
+const CustomType = @import("../parser/parser.zig").expressions.CustomType;
+const Custom = @import("../parser/parser.zig").expressions.Custom;
+const LiteralType = @import("../parser/parser.zig").expressions.LiteralType;
 
 const StdFunction = *const fn (Runner, []*Expression) anyerror!Expression;
 const Module = @import("modules/mod.zig").Module;
@@ -89,8 +92,8 @@ pub const Runner = struct {
 
     variables: *std.StringHashMap(*Expression),
     modules: *std.StringHashMap(Module),
-    // zig_functions: *std.StringHashMap(Handler),
     functions: *std.StringHashMap(Statement),
+    customs: *std.StringHashMap(CustomType),
     statements: []*Statement,
 
     certain_count: *usize,
@@ -115,6 +118,9 @@ pub const Runner = struct {
         const modules = try allocator.create(std.StringHashMap(Module));
         modules.* = std.StringHashMap(Module).init(allocator);
 
+        const customs = try allocator.create(std.StringHashMap(CustomType));
+        customs.* = std.StringHashMap(CustomType).init(allocator);
+
         // const zig_functions = try allocator.create(std.StringHashMap(Handler));
         // zig_functions.* = std.StringHashMap(Handler).init(allocator);
 
@@ -135,7 +141,7 @@ pub const Runner = struct {
 
             .variables = variables,
             .modules = modules,
-            // .zig_functions = zig_functions,
+            .customs = customs,
             .functions = functions,
             .statements = statements,
 
@@ -272,6 +278,11 @@ pub const Runner = struct {
                                         expr.* = value;
                                         try self.variables.put(try std.mem.join(self.allocator, "_", &.{ mod.name, key }), expr);
                                     }
+
+                                    for (mod.customs.kvs.keys, 0..mod.customs.kvs.len) |key, _| {
+                                        const custom = try mod.customs.get(key).?(self);
+                                        try self.customs.put(try std.mem.join(self.allocator, "_", &.{ mod.name, key }), custom);
+                                    }
                                 } else {
                                     var imported_file = try self.allocator.alloc(u8, dirname.len + import_target.len + 1); // self.location.dirname().?; // directive.arguments.?.items[0];
 
@@ -340,6 +351,13 @@ pub const Runner = struct {
                                             .number = @floatFromInt(i),
                                         },
                                     };
+                                } else {
+                                    try variables.put(name, name_expr);
+                                    name_expr.* = Expression{
+                                        .literal = Literal{
+                                            .number = @floatFromInt(i),
+                                        },
+                                    };
                                 }
 
                                 if (try self.run_snippet(repeat_stmt.body.items, variables)) |result| {
@@ -347,7 +365,22 @@ pub const Runner = struct {
                                 }
                             }
                         },
-                        // else => {},
+                        .object_statement => |object_stmt| {
+                            const object_name = object_stmt.name;
+                            const object = try self.allocator.create(CustomType);
+
+                            object.* = CustomType{
+                                .name = object_name,
+                                .fields = object_stmt.properties,
+                            };
+
+                            if (self.customs.get(object_name)) |_| {
+                                try self.stderr.print("Custom type '{s}' already exists\n", .{object_name});
+                                std.process.exit(1);
+                            }
+
+                            try self.customs.put(object_name, object.*);
+                        },
                     }
                 }
             }
@@ -526,32 +559,56 @@ pub const Runner = struct {
             .call => |call| try self.call_function(call, variables),
             .get_attribute => |ga| {
                 const module_expr = try self.evaluate_expression(ga.object.*, variables);
-                if (module_expr.literal != .module) {
-                    try self.stderr.print("Expected a module, got: {s}\n", .{try module_expr.literal.to_string(self.allocator, self)});
-                    std.process.exit(1);
-                }
+                switch (module_expr.literal) {
+                    .module => {
+                        const module = module_expr.literal.module;
 
-                const module = module_expr.literal.module;
+                        const attribute = ga.attribute.identifier;
 
-                const attribute = ga.attribute.identifier;
-
-                if (module.constants.get(attribute.name)) |value| {
-                    return value;
-                } else if (module.functions.get(attribute.name)) |handler| {
-                    return Expression{
-                        .literal = .{
-                            .function = .{
-                                .name = attribute.name,
-                                .handler = .{
-                                    .native = handler,
+                        if (module.constants.get(attribute.name)) |value| {
+                            return value;
+                        } else if (module.functions.get(attribute.name)) |handler| {
+                            return Expression{
+                                .literal = .{
+                                    .function = .{
+                                        .name = attribute.name,
+                                        .handler = .{
+                                            .native = handler,
+                                        },
+                                    },
                                 },
-                            },
-                        },
-                    };
-                } else {
-                    try self.stderr.print("Module '{s}' has no attribute '{s}'\n", .{ module.name, attribute.name });
-                    std.process.exit(1);
+                            };
+                        } else {
+                            try self.stderr.print("Module '{s}' has no attribute '{s}'\n", .{ module.name, attribute.name });
+                            std.process.exit(1);
+                        }
+                    },
+                    .custom => {
+                        const custom = module_expr.literal.custom;
+
+                        const attribute = ga.attribute.identifier;
+
+                        if (custom.values.get(attribute.name)) |value| {
+                            return value;
+                        } else {
+                            try self.stderr.print("Custom type '{s}' has no attribute '{s}'\n", .{ custom.corr_type.name, attribute.name });
+                            std.process.exit(1);
+                        }
+                    },
+                    else => {
+                        try self.stderr.print("Expected a module or custom type, got: {s}\n", .{try module_expr.literal.to_string(self.allocator, self)});
+                        std.process.exit(1);
+                    },
                 }
+            },
+            .custom => |custom| {
+                std.debug.print("Custom type: {s}\n", .{custom.corr_type.name});
+
+                return Expression{
+                    .literal = Literal{
+                        .custom = custom,
+                    },
+                };
             },
         };
     }

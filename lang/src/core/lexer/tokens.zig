@@ -44,6 +44,8 @@ pub const TokenType = enum {
 
     Fun,
     Throwaway, // return
+    Object,
+    Arrow,
 
     Try,
     Gotcha,

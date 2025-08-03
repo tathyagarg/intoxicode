@@ -1,0 +1,10 @@
+@all
+
+object meow {
+  abc -> number,
+  def -> string
+}
+
+obj = meow { abc -> 1, def -> "eek" }
+
+scream(obj ~ abc)

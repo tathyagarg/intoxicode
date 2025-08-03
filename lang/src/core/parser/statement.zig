@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const Expression = @import("expressions.zig").Expression;
+const LiteralType = @import("expressions.zig").LiteralType;
 const Handler = @import("../runner/runner.zig").Handler;
 
 pub const Statement = union(enum) {
@@ -13,6 +14,7 @@ pub const Statement = union(enum) {
     throwaway_statement: ThrowawayStatement,
     directive: Directive,
     repeat_statement: RepeatStatement,
+    object_statement: ObjectStatement,
 
     pub fn get_certainty(self: Statement) !f32 {
         return switch (self) {
@@ -28,6 +30,7 @@ pub const Statement = union(enum) {
             .throwaway_statement => self.throwaway_statement.certainty,
             .directive => 1.0,
             .repeat_statement => self.repeat_statement.certainty,
+            .object_statement => 1.0, // Objects are always certain
         };
     }
 
@@ -45,6 +48,7 @@ pub const Statement = union(enum) {
             .throwaway_statement => |*t| t.certainty = certainty,
             .directive => {},
             .repeat_statement => |*r| r.certainty = certainty,
+            .object_statement => {}, // Objects do not have certainty
         }
     }
 
@@ -71,6 +75,7 @@ pub const Statement = union(enum) {
             .try_statement => |t| t.pretty_print(allocator),
             .directive => |d| d.pretty_print(allocator),
             .repeat_statement => |r| r.pretty_print(allocator),
+            .object_statement => |o| o.pretty_print(allocator),
         };
     }
 };
@@ -293,5 +298,33 @@ pub const RepeatStatement = struct {
 
         const result = try builder.toOwnedSlice();
         return result;
+    }
+};
+
+pub const ObjectStatement = struct {
+    name: []const u8,
+    properties: std.StringHashMap(LiteralType),
+
+    pub fn pretty_print(self: ObjectStatement, allocator: std.mem.Allocator) anyerror![]const u8 {
+        var builder = std.ArrayList(u8).init(allocator);
+        defer builder.deinit();
+
+        try builder.appendSlice("object ");
+        try builder.appendSlice(self.name);
+        try builder.appendSlice(" {\n");
+
+        var entry_iter = self.properties.iterator();
+
+        while (entry_iter.next()) |entry| {
+            try builder.appendSlice("    ");
+            try builder.appendSlice(entry.key_ptr.*);
+            try builder.appendSlice(": ");
+            try builder.appendSlice(entry.value_ptr.*.to_string());
+            try builder.appendSlice(",\n");
+        }
+
+        try builder.appendSlice("}\n");
+
+        return try builder.toOwnedSlice();
     }
 };

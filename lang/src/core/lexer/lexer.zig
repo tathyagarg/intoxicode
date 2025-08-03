@@ -24,6 +24,7 @@ pub const Keywords = [_]Pair{
     .{ .key = "false", .value = .Boolean },
     .{ .key = "to", .value = .To },
     .{ .key = "repeat", .value = .Repeat },
+    .{ .key = "object", .value = .Object },
 };
 
 pub fn is_keyword(token: []const u8) bool {
@@ -94,8 +95,10 @@ pub const Lexer = struct {
                 if (next >= '0' and next <= '9') {
                     self.advance();
                     try self.add_token(try self.number());
+                } else if (next == '>') {
+                    self.advance();
+                    try self.add_token(TokenType.Arrow);
                 } else {
-                    // This is a minus operator
                     try self.add_token(TokenType.Minus);
                 }
             },

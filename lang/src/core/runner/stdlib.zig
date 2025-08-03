@@ -162,14 +162,14 @@ pub fn to_number(runner: Runner, args: []*Expression) anyerror!Expression {
                 },
             };
         },
-        .function, .module, .array => {
-            try runner.stderr.print("to_number() cannot convert given datatype to number\n", .{});
-            std.process.exit(1);
-        },
         .number => |num| Expression{
             .literal = Literal{
                 .number = num,
             },
+        },
+        else => {
+            try runner.stderr.print("to_number() cannot convert given datatype to number\n", .{});
+            std.process.exit(1);
         },
     };
 }

@@ -14,6 +14,7 @@ pub const Expression = union(enum) {
     call: Call,
     indexing: Indexing,
     get_attribute: GetAttribute,
+    custom: Custom,
 
     pub fn equals(self: Expression, other: Expression, runner: Runner) !bool {
         return switch (other) {
@@ -46,6 +47,7 @@ pub const Expression = union(enum) {
                         },
                         .module => |mod| std.mem.eql(u8, l.module.name, mod.name),
                         .function => false,
+                        .custom => false, // TODO
                     };
                 },
                 else => false,
@@ -82,6 +84,7 @@ pub const Expression = union(enum) {
                 else => false,
             },
             .get_attribute => false,
+            .custom => false,
         };
     }
 
@@ -134,6 +137,7 @@ pub const Expression = union(enum) {
                     return try std.fmt.allocPrint(allocator, "Literal(module = {s})", .{module_name});
                 },
                 .function => |f| try std.fmt.allocPrint(allocator, "Function({s})", .{f.name}),
+                .custom => "",
             },
             .identifier => self.identifier.pretty_print(allocator),
             .call => |c| {
@@ -165,6 +169,24 @@ pub const Expression = union(enum) {
                 );
             },
             .get_attribute => |ga| try ga.pretty_print(allocator),
+            .custom => |c| {
+                const corr_type_str = c.corr_type.name;
+                var fields = std.ArrayList([]const u8).init(allocator);
+
+                var value_iter = c.values.iterator();
+
+                while (value_iter.next()) |field| {
+                    const field_str = field.key_ptr.*;
+                    try fields.append(field_str);
+                }
+                const result = try std.fmt.allocPrint(
+                    allocator,
+                    "Custom({s}: {s})",
+                    .{ corr_type_str, try std.mem.join(allocator, ", ", fields.items) },
+                );
+                fields.deinit();
+                return result;
+            },
         };
     }
 
@@ -177,6 +199,7 @@ pub const Expression = union(enum) {
             .call => self.call.certainty,
             .indexing => 1.0,
             .get_attribute => 1.0, // attributes are certain if the object is certain
+            .custom => 1.0, // custom types are certain if the type is known
         };
     }
 
@@ -186,7 +209,7 @@ pub const Expression = union(enum) {
             .grouping => |*g| g.certainty = certainty,
             .identifier => |*id| id.certainty = certainty,
             .call => |*c| c.certainty = certainty,
-            .get_attribute, .literal, .indexing => {},
+            .custom, .get_attribute, .literal, .indexing => {},
         }
     }
 };
@@ -205,7 +228,37 @@ pub const Grouping = struct {
     certainty: f32 = 1.0,
 };
 
-pub const Literal = union(enum) {
+pub const LiteralType = enum {
+    number,
+    string,
+    boolean,
+    null,
+    array,
+    function,
+    module,
+    custom,
+
+    pub fn from_string(s: []const u8) !LiteralType {
+        return LiteralTypeMap.get(s) orelse {
+            return error.InvalidLiteralType;
+        };
+    }
+
+    pub fn to_string(self: LiteralType) []const u8 {
+        return switch (self) {
+            .number => "number",
+            .string => "string",
+            .boolean => "boolean",
+            .null => "null",
+            .array => "array",
+            .function => "function",
+            .module => "module",
+            .custom => "custom",
+        };
+    }
+};
+
+pub const Literal = union(LiteralType) {
     number: f32,
     string: []const u8,
     boolean: bool,
@@ -213,6 +266,7 @@ pub const Literal = union(enum) {
     array: std.ArrayList(Expression),
     function: Function,
     module: Module,
+    custom: Custom,
 
     pub fn number_from_string(s: []const u8) !Literal {
         const number = try std.fmt.parseFloat(f32, s);
@@ -268,6 +322,23 @@ pub const Literal = union(enum) {
                 return try std.fmt.allocPrint(allocator, "Module({s})", .{mod.name});
             },
             .function => |f| f.name,
+            .custom => |c| {
+                var fields = std.ArrayList([]const u8).init(allocator);
+
+                var value_iter = c.values.iterator();
+
+                while (value_iter.next()) |field| {
+                    const field_str = field.key_ptr.*;
+                    try fields.append(field_str);
+                }
+                const result = try std.fmt.allocPrint(
+                    allocator,
+                    "Custom({s}: {s})",
+                    .{ c.corr_type.name, try std.mem.join(allocator, ", ", fields.items) },
+                );
+                fields.deinit();
+                return result;
+            },
         };
     }
 };
@@ -317,4 +388,25 @@ pub const GetAttribute = struct {
 
         return try std.fmt.allocPrint(allocator, "GetAttribute({s} ~ {s})", .{ object_str, attribute_str });
     }
+};
+
+pub const CustomType = struct {
+    name: []const u8,
+    fields: std.StringHashMap(LiteralType),
+};
+
+pub const LiteralTypeMap = std.StaticStringMap(LiteralType).initComptime(.{
+    .{ "number", .number },
+    .{ "string", .string },
+    .{ "boolean", .boolean },
+    .{ "null", .null },
+    .{ "array", .array },
+    .{ "function", .function },
+    .{ "module", .module },
+    .{ "custom", .custom },
+});
+
+pub const Custom = struct {
+    corr_type: Identifier,
+    values: std.StringHashMap(Expression),
 };
