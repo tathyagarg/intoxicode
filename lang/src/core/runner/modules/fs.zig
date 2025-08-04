@@ -14,6 +14,14 @@ const OpenMode = std.fs.File.OpenMode;
 const READ = 0x0001;
 const WRITE = 0x0002;
 
+fn make_handle(arg: Expression) anyerror!std.posix.fd_t {
+    return switch (native_os) {
+        .windows => @ptrFromInt(@as(u32, @intFromFloat(arg.literal.number))),
+        .macos, .linux => @intFromFloat(arg.literal.number),
+        else => return error.UnsupportedOS,
+    };
+}
+
 pub fn open(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(2, &.{ &.{.string}, &.{.number} }, "open", runner, args);
 
@@ -36,7 +44,11 @@ pub fn open(runner: Runner, args: []*Expression) anyerror!Expression {
 
     return Expression{
         .literal = .{
-            .number = @floatFromInt(file.handle),
+            .number = switch (native_os) {
+                .windows => @floatFromInt(@as(usize, @intFromPtr(file.handle))),
+                .macos, .linux => @floatFromInt(file.handle),
+                else => return error.UnsupportedOS,
+            },
         },
     };
 }
@@ -44,8 +56,7 @@ pub fn open(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn pread(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(4, &.{ &.{.number}, &.{.string}, &.{.number}, &.{.number} }, "pread", runner, args);
 
-    const handle: c_int = @intFromFloat(args[0].literal.number);
-    // const buffer: []u8 = args[1].literal.string;
+    const handle = try make_handle(args[0].*);
 
     const buffer_size: usize = @intFromFloat(args[3].literal.number);
 
@@ -53,11 +64,7 @@ pub fn pread(runner: Runner, args: []*Expression) anyerror!Expression {
 
     const offset: u32 = @intFromFloat(args[2].literal.number);
 
-    const size = switch (native_os) {
-        .windows => std.os.windows.ReadFile(handle, buffer[0..], offset),
-        .macos, .linux => try std.posix.pread(handle, buffer[0..], offset),
-        else => return error.UnsupportedOS,
-    };
+    const size = try std.posix.pread(handle, buffer[0..], offset);
 
     args[1].* = Expression{ .literal = .{ .string = buffer } };
 
@@ -67,16 +74,12 @@ pub fn pread(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn read(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(3, &.{ &.{.number}, &.{.string}, &.{.number} }, "read", runner, args);
 
-    const handle: c_int = @intFromFloat(args[0].literal.number);
+    const handle = try make_handle(args[0].*);
     const buffer_size: usize = @intFromFloat(args[2].literal.number);
 
     var buffer: []u8 = try runner.allocator.alloc(u8, buffer_size);
 
-    const size = switch (native_os) {
-        .windows => std.os.windows.ReadFile(handle, buffer[0..], null),
-        .macos, .linux => try std.posix.read(handle, buffer[0..]),
-        else => return error.UnsupportedOS,
-    };
+    const size = try std.posix.read(handle, buffer[0..]);
 
     args[1].* = Expression{ .literal = .{ .string = buffer } };
 
@@ -86,7 +89,7 @@ pub fn read(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn seek_to(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(2, &.{ &.{.number}, &.{.number} }, "seek_to", runner, args);
 
-    const handle: c_int = @intFromFloat(args[0].literal.number);
+    const handle = try make_handle(args[0].*);
     const offset: u32 = @intFromFloat(args[1].literal.number);
 
     try std.posix.lseek_SET(handle, offset);
@@ -97,7 +100,7 @@ pub fn seek_to(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn seek_by(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(2, &.{ &.{.number}, &.{.number} }, "seek_by", runner, args);
 
-    const handle: c_int = @intFromFloat(args[0].literal.number);
+    const handle = try make_handle(args[0].*);
     const offset: i32 = @intFromFloat(args[1].literal.number);
 
     try std.posix.lseek_CUR(handle, offset);
@@ -108,14 +111,10 @@ pub fn seek_by(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn write(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(2, &.{ &.{.number}, &.{.string} }, "write", runner, args);
 
-    const handle: c_int = @intFromFloat(args[0].literal.number);
+    const handle = try make_handle(args[0].*);
     const data: []const u8 = args[1].literal.string;
 
-    const size = switch (native_os) {
-        .windows => try std.os.windows.WriteFile(handle, data, null),
-        .macos, .linux => try std.posix.write(handle, data),
-        else => return error.UnsupportedOS,
-    };
+    const size = try std.posix.write(handle, data);
 
     return Expression{ .literal = .{ .number = @floatFromInt(size) } };
 }
@@ -123,13 +122,9 @@ pub fn write(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn close(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(1, &.{&.{.number}}, "close", runner, args);
 
-    const handle: c_int = @intFromFloat(args[0].literal.number);
+    const handle = try make_handle(args[0].*);
 
-    switch (native_os) {
-        .windows => std.os.windows.CloseHandle(handle),
-        .macos, .linux => std.posix.close(handle),
-        else => return error.UnsupportedOS,
-    }
+    std.posix.close(handle);
 
     return Expression{ .literal = .{ .null = null } };
 }
@@ -137,17 +132,13 @@ pub fn close(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn read_to_zero(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(2, &.{ &.{.number}, &.{.string} }, "read_to_zero", runner, args);
 
-    const handle: c_int = @intFromFloat(args[0].literal.number);
+    const handle = try make_handle(args[0].*);
 
     var buffer: [1]u8 = undefined;
     var res = std.ArrayList(u8).init(runner.allocator);
 
     while (buffer[0] != 0) {
-        _ = switch (native_os) {
-            .windows => std.os.windows.ReadFile(handle, buffer[0..], null),
-            .macos, .linux => try std.posix.read(handle, buffer[0..]),
-            else => return error.UnsupportedOS,
-        };
+        _ = try std.posix.read(handle, buffer[0..]);
 
         if (buffer[0] == 0) {
             break;

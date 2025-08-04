@@ -47,6 +47,20 @@ const SOCK_RDM = 4;
 const SOCK_SEQPACKET = 5;
 const SOCK_PACKET = 10;
 
+fn make_fd_num(sock: std.posix.socket_t) anyerror!f32 {
+    return switch (native_os) {
+        .windows => @floatFromInt(@as(usize, @intFromPtr(sock))),
+        else => @floatFromInt(sock),
+    };
+}
+
+fn make_socket_t(arg: Expression) anyerror!std.posix.socket_t {
+    return switch (native_os) {
+        .windows => @ptrFromInt(@as(u32, @intFromFloat(arg.literal.number))),
+        else => @intFromFloat(arg.literal.number),
+    };
+}
+
 pub fn socket(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(3, &.{ &.{.number}, &.{.number}, &.{.number} }, "socket", runner, args);
 
@@ -54,14 +68,11 @@ pub fn socket(runner: Runner, args: []*Expression) anyerror!Expression {
     const _type: u32 = @intFromFloat(args[1].literal.number);
     const protocol: u32 = @intFromFloat(args[2].literal.number);
 
-    const socket_fd = std.c.socket(domain, _type, protocol);
-    if (socket_fd < 0) {
-        return error.SocketError;
-    }
+    const socket_fd = try std.posix.socket(domain, _type, protocol);
 
     return Expression{
         .literal = .{
-            .number = @floatFromInt(socket_fd),
+            .number = try make_fd_num(socket_fd),
         },
     };
 }
@@ -69,7 +80,7 @@ pub fn socket(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn connect(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(3, &.{ &.{.number}, &.{.string}, &.{.number} }, "connect", runner, args);
 
-    const sockfd: c_int = @intFromFloat(args[0].literal.number);
+    const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
     const address_raw: []const u8 = args[1].literal.string;
     const port_raw: u16 = @intFromFloat(args[2].literal.number);
 
@@ -108,7 +119,6 @@ pub fn connect(runner: Runner, args: []*Expression) anyerror!Expression {
     };
 
     const sockaddr_ptr: *const std.posix.sockaddr = @ptrCast(&sockaddr_in);
-    _ = .{sockaddr_ptr};
 
     try std.posix.connect(sockfd, sockaddr_ptr, @sizeOf(std.posix.sockaddr.in));
 
@@ -122,7 +132,7 @@ pub fn connect(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn bind(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(3, &.{ &.{.number}, &.{.string}, &.{.number} }, "bind", runner, args);
 
-    const sockfd: c_int = @intFromFloat(args[0].literal.number);
+    const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
     const address_raw: []const u8 = args[1].literal.string;
     const port_raw: u16 = @intFromFloat(args[2].literal.number);
 
@@ -173,7 +183,7 @@ pub fn bind(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn listen(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(2, &.{ &.{.number}, &.{.number} }, "listen", runner, args);
 
-    const sockfd: c_int = @intFromFloat(args[0].literal.number);
+    const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
     const backlog: u31 = @intFromFloat(args[1].literal.number);
 
     try std.posix.listen(sockfd, backlog);
@@ -184,14 +194,18 @@ pub fn listen(runner: Runner, args: []*Expression) anyerror!Expression {
 pub fn accept(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(4, &.{ &.{.number}, &.{.string}, &.{.number}, &.{.number} }, "accept", runner, args);
 
-    const sockfd: c_int = @intFromFloat(args[0].literal.number);
-
+    const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
     var sockaddr: std.c.sockaddr = undefined;
     var socklen: u32 = undefined;
 
-    const client_fd = try std.posix.accept(sockfd, &sockaddr, &socklen, 0);
+    const client_fd: std.posix.socket_t = try std.posix.accept(sockfd, &sockaddr, &socklen, 0);
 
-    return Expression{ .literal = .{ .number = @floatFromInt(client_fd) } };
+    return Expression{
+        .literal = .{
+            .number = try make_fd_num(client_fd),
+        },
+    };
+    // return Expression{ .literal = .{ .number = @floatFromInt(client_fd) } };
 }
 
 pub const Socket = Module{

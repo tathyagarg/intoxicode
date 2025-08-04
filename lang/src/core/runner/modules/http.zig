@@ -11,6 +11,11 @@ const LiteralType = @import("../../parser/parser.zig").expressions.LiteralType;
 const Module = @import("mod.zig").Module;
 const Handler = @import("../runner.zig").Handler;
 
+const GET = "GET";
+const POST = "POST";
+const PUT = "PUT";
+const DELETE = "DELETE";
+
 fn Header(runner: Runner) !CustomType {
     var fields = std.StringHashMap(LiteralType).init(runner.allocator);
     try fields.put("name", LiteralType.string);
@@ -116,10 +121,10 @@ pub const Http = Module{
         .{ "request_from_data", &request_from_data },
     }),
     .constants = std.StaticStringMap(Expression).initComptime(.{
-        .{ "get", Expression{ .literal = .{ .string = "GET" } } },
-        .{ "post", Expression{ .literal = .{ .string = "POST" } } },
-        .{ "put", Expression{ .literal = .{ .string = "PUT" } } },
-        .{ "delete", Expression{ .literal = .{ .string = "DELETE" } } },
+        .{ "get", Expression{ .literal = .{ .string = GET } } },
+        .{ "post", Expression{ .literal = .{ .string = POST } } },
+        .{ "put", Expression{ .literal = .{ .string = PUT } } },
+        .{ "delete", Expression{ .literal = .{ .string = DELETE } } },
     }),
     .customs = std.StaticStringMap(*const fn (Runner) anyerror!CustomType).initComptime(.{
         .{ "Request", &Request },
