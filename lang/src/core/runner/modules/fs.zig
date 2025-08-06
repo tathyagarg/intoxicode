@@ -44,9 +44,9 @@ pub fn open(runner: Runner, args: []*Expression) anyerror!Expression {
 
     return Expression{
         .literal = .{
-            .number = switch (native_os) {
-                .windows => @floatFromInt(@as(usize, @intFromPtr(file.handle))),
-                .macos, .linux => @floatFromInt(file.handle),
+            .integer = switch (native_os) {
+                .windows => @intCast(@as(usize, @intFromPtr(file.handle))),
+                .macos, .linux => @intCast(file.handle),
                 else => return error.UnsupportedOS,
             },
         },

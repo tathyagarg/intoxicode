@@ -64,7 +64,7 @@ pub fn socket(runner: Runner, args: []*Expression) anyerror!Expression {
 
     return Expression{
         .literal = .{
-            .number = try make_fd_num(socket_fd),
+            .integer = try make_fd_num(socket_fd),
         },
     };
 }
