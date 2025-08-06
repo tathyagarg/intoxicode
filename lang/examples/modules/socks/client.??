@@ -1,17 +1,15 @@
 @all
 @import("socket")
 @import("fs")
+@import("http")
 
 fd = socket ~ socket(socket ~ AF_INET, socket ~ SOCK_STREAM, 0)
 socket ~ connect(fd, "127.0.0.1", 8000)
 
-fs ~ write(fd, "POST /")
+req = http ~ get(fd, "/", [])
+fs ~ write(fd, http ~ make_request_data(req))
+# socket ~ send(fd, http ~ make_request_data(req), 0)
+socket ~ shutdown(fd, socket ~ SHUT_SEND)
 
-cb = "_"
-res = ""
-
-fs ~ read(fd, res, 100)
-
-scream(res, "\n")
-
-fs ~ close(fd)
+res = fs ~ read_full_buffer(fd, 512)
+scream(res)

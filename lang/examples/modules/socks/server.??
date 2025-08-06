@@ -7,31 +7,36 @@ fun get_root() {
   throwaway "This is the home page"
 }
 
+PORT = 8000
+
 fd = socket ~ socket(socket ~ AF_INET, socket ~ SOCK_STREAM, 0)
-socket ~ bind(fd, "127.0.0.1", 8000)
+socket ~ bind(fd, "127.0.0.1", PORT)
 socket ~ listen(fd, 10)
-scream("Listening\n")
+scream("Listening on port ", PORT, "\n")
 
 loop (true) {
-  client = socket ~ accept(fd, "", 1, 2)
+  try {
+    # honestly idk what the params after fd are for
+    client = socket ~ accept(fd, "", 1, 2)
 
-  client_msg = ""
-  fs ~ read(client, client_msg, 200)
+    client_msg = fs ~ read_full_buffer(client, 512)
+    scream("MEOW?: ", client_msg, "\n")
 
-  request = http ~ request_from_data(client_msg)
+    request = http ~ request_from_data(client_msg)
 
-  scream("Data: \n", client_msg, "\n\n")
+    scream("Method ", request ~ method, "\n")
+    scream("URL ", request ~ url, "\n")
+    scream("Protocol ", request ~ protocol, "\n")
 
-  scream("Method ", request ~ method, "\n")
-  scream("URL ", request ~ url, "\n")
-  scream("Protocol ", request ~ protocol, "\n")
+    repeat i to length(request ~ headers) {
+      scream("Header ", i + 1, ":\n  - Name: ", ((request ~ headers)[i]) ~ name, "\n  - Value: ", ((request ~ headers)[i]) ~ value, "\n")
+    }
 
-  repeat i to length(request ~ headers) {
-    scream("Header ", i + 1, ":\n  - Name: ", ((request ~ headers)[i]) ~ name, "\n  - Value: ", ((request ~ headers)[i]) ~ value, "\n")
+    scream("Body ", request ~ body, "\n")
+
+    fs ~ write(client, "Meow")
+    socket ~ shutdown(client, socket ~ SHUT_SEND)
+  } gotcha {
+      scream("Oopsie in processing request\n")
   }
-
-  # scream("Headers ", request ~ headers, "\n")
-  scream("Body ", request ~ body, "\n")
-
-  fs ~ write(client, "Meow")
 }

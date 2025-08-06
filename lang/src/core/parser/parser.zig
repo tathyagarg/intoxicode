@@ -704,12 +704,17 @@ pub const Parser = struct {
 
                         _ = try self.consume(.RightBrace, "Expected '}' to end object literal.");
 
+                        const corr_type = try self.allocator.create(Expression);
+                        corr_type.* = Expression{
+                            .identifier = expressions.Identifier{
+                                .name = token.value,
+                            },
+                        };
+
                         return Expression{
                             .literal = expressions.Literal{
                                 .custom = .{
-                                    .corr_type = Identifier{
-                                        .name = token.value,
-                                    },
+                                    .corr_type = corr_type,
                                     .values = properties.*,
                                 },
                             },
@@ -722,8 +727,11 @@ pub const Parser = struct {
                         },
                     };
                 },
-                .Integer, .Float => Expression{
-                    .literal = try expressions.Literal.number_from_string(token.value),
+                .Integer => Expression{
+                    .literal = try expressions.Literal.integer_from_string(token.value),
+                },
+                .Float => Expression{
+                    .literal = try expressions.Literal.float_from_string(token.value),
                 },
                 .String => Expression{
                     .literal = expressions.Literal{
@@ -757,6 +765,6 @@ pub const Parser = struct {
             };
         }
 
-        std.debug.panic("Unexpected token: {s} ({})", .{ self.peek().value, self.peek().token_type });
+        std.debug.panic("Unexpected token: {s} ({}) after {s}", .{ self.peek().value, self.peek().token_type, self.tokens.items[self.current - 1].value });
     }
 };

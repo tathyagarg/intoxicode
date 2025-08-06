@@ -34,7 +34,8 @@ pub const Expression = union(enum) {
             .literal => |l| switch (self) {
                 .literal => |self_l| {
                     return switch (self_l) {
-                        .number => l.number == self_l.number,
+                        .integer => l.integer == self_l.integer,
+                        .float => l.float == self_l.float,
                         .string => std.mem.eql(u8, l.string, self_l.string),
                         .boolean => l.boolean == self_l.boolean,
                         .null => l.null == self_l.null,
@@ -71,11 +72,11 @@ pub const Expression = union(enum) {
                     const right_array = try runner.evaluate_expression(i.array.*, runner.variables);
 
                     const left_element = try runner.evaluate_expression(
-                        left_array.literal.array.items[@intFromFloat(left_index.literal.number)],
+                        left_array.literal.array.items[@intCast(left_index.literal.integer)],
                         runner.variables,
                     );
                     const right_element = try runner.evaluate_expression(
-                        right_array.literal.array.items[@intFromFloat(right_index.literal.number)],
+                        right_array.literal.array.items[@intCast(right_index.literal.integer)],
                         runner.variables,
                     );
 
@@ -91,6 +92,7 @@ pub const Expression = union(enum) {
     pub fn pretty_print(self: Expression, allocator: std.mem.Allocator) anyerror![]const u8 {
         return switch (self) {
             .binary => {
+                std.debug.print("MEOWOWOWOWOOOOWOOWO\n\n\n\n\n", .{});
                 const left = try self.binary.left.pretty_print(allocator);
                 defer allocator.free(left);
 
@@ -114,7 +116,9 @@ pub const Expression = union(enum) {
                 return try std.fmt.allocPrint(allocator, "Group({s})", .{inner});
             },
             .literal => switch (self.literal) {
-                .number => try std.fmt.allocPrint(allocator, "Literal(number = {d})", .{self.literal.number}),
+                .integer => |n| try std.fmt.allocPrint(allocator, "Literal(integer = {d})", .{n}),
+                .float => |n| try std.fmt.allocPrint(allocator, "Literal(float = {d})", .{n}),
+                // .number => try std.fmt.allocPrint(allocator, "Literal(number = {d})", .{self.literal.number}),
                 .string => try std.fmt.allocPrint(allocator, "Literal(string = {s})", .{self.literal.string}),
                 .boolean => if (self.literal.boolean) "true" else "false",
                 .null => "null",
@@ -170,7 +174,7 @@ pub const Expression = union(enum) {
             },
             .get_attribute => |ga| try ga.pretty_print(allocator),
             .custom => |c| {
-                const corr_type_str = c.corr_type.name;
+                const corr_type_str = try c.corr_type.pretty_print(allocator);
                 var fields = std.ArrayList([]const u8).init(allocator);
 
                 var value_iter = c.values.iterator();
@@ -229,7 +233,9 @@ pub const Grouping = struct {
 };
 
 pub const LiteralType = enum {
-    number,
+    integer,
+    float,
+    // number,
     string,
     boolean,
     null,
@@ -246,7 +252,9 @@ pub const LiteralType = enum {
 
     pub fn to_string(self: LiteralType) []const u8 {
         return switch (self) {
-            .number => "number",
+            .integer => "integer",
+            .float => "float",
+            // .number => "number",
             .string => "string",
             .boolean => "boolean",
             .null => "null",
@@ -259,7 +267,9 @@ pub const LiteralType = enum {
 };
 
 pub const Literal = union(LiteralType) {
-    number: f32,
+    integer: i32,
+    float: f32,
+    // number: f32,
     string: []const u8,
     boolean: bool,
     null: ?void,
@@ -268,14 +278,20 @@ pub const Literal = union(LiteralType) {
     module: Module,
     custom: Custom,
 
-    pub fn number_from_string(s: []const u8) !Literal {
+    pub fn integer_from_string(s: []const u8) !Literal {
+        const number = try std.fmt.parseInt(i32, s, 10);
+        return Literal{ .integer = number };
+    }
+
+    pub fn float_from_string(s: []const u8) !Literal {
         const number = try std.fmt.parseFloat(f32, s);
-        return Literal{ .number = number };
+        return Literal{ .float = number };
     }
 
     pub fn to_string(self: Literal, allocator: std.mem.Allocator, runner: Runner) ![]const u8 {
         return switch (self) {
-            .number => |n| try std.fmt.allocPrint(allocator, "{d}", .{n}),
+            .integer => |n| try std.fmt.allocPrint(allocator, "{d}", .{n}),
+            .float => |n| try std.fmt.allocPrint(allocator, "{d}", .{n}),
             .string => |s| {
                 const removed_quotes = s;
 
@@ -334,7 +350,7 @@ pub const Literal = union(LiteralType) {
                 const result = try std.fmt.allocPrint(
                     allocator,
                     "Custom({s}: {s})",
-                    .{ c.corr_type.name, try std.mem.join(allocator, ", ", fields.items) },
+                    .{ try c.corr_type.pretty_print(allocator), try std.mem.join(allocator, ", ", fields.items) },
                 );
                 fields.deinit();
                 return result;
@@ -396,7 +412,9 @@ pub const CustomType = struct {
 };
 
 pub const LiteralTypeMap = std.StaticStringMap(LiteralType).initComptime(.{
-    .{ "number", .number },
+    .{ "integer", .integer },
+    .{ "float", .float },
+    // .{ "number", .number },
     .{ "string", .string },
     .{ "boolean", .boolean },
     .{ "null", .null },
@@ -407,6 +425,6 @@ pub const LiteralTypeMap = std.StaticStringMap(LiteralType).initComptime(.{
 });
 
 pub const Custom = struct {
-    corr_type: Identifier,
+    corr_type: *const Expression,
     values: std.StringHashMap(Expression),
 };

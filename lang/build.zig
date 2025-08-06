@@ -17,6 +17,8 @@ pub fn build(b: *std.Build) !void {
             .{ .cpu_arch = .x86_64, .os_tag = .macos },
         };
 
+    var exe: *std.Build.Step.Compile = undefined;
+
     for (targets) |target| {
         const name = try std.fmt.allocPrint(
             b.allocator,
@@ -27,7 +29,7 @@ pub fn build(b: *std.Build) !void {
             },
         );
 
-        const exe = b.addExecutable(.{
+        exe = b.addExecutable(.{
             .name = name,
             .root_source_file = b.path("src/main.zig"),
             .target = b.resolveTargetQuery(target),
@@ -38,12 +40,7 @@ pub fn build(b: *std.Build) !void {
         b.installArtifact(exe);
     }
 
-    const run_cmd = b.addRunArtifact(b.addExecutable(.{
-        .name = "intoxicode-run",
-        .root_source_file = b.path("src/main.zig"),
-        .target = default_target,
-        .optimize = optimize,
-    }));
+    const run_cmd = b.addRunArtifact(exe);
     run_cmd.step.dependOn(b.getInstallStep());
     if (b.args) |args| run_cmd.addArgs(args);
 

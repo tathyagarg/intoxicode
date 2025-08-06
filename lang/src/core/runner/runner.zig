@@ -43,6 +43,7 @@ const std_functions = std.StaticStringMap(StdFunction).initComptime(.{
     .{ "find_first", stdlib.find_first },
     .{ "find_last", stdlib.find_last },
     .{ "update", stdlib.update },
+    .{ "strip_last_n", stdlib.strip_last_n },
     .{ "sin", stdlib.sin },
     .{ "cos", stdlib.cos },
 });
@@ -324,15 +325,15 @@ pub const Runner = struct {
                             const name = repeat_stmt.variable;
 
                             const count = try self.evaluate_expression(repeat_stmt.count, variables);
-                            if (count.literal != .number) {
+                            if (count.literal != .integer) {
                                 try self.stderr.print(
-                                    "Repeat count must be a number, got: {s}\n",
+                                    "Repeat count must be an integer, got: {s}\n",
                                     .{try count.literal.to_string(self.allocator, self)},
                                 );
                                 std.process.exit(1);
                             }
 
-                            const repeat_count = @as(usize, @intFromFloat(count.literal.number));
+                            const repeat_count = count.literal.integer;
                             if (repeat_count == 0) {
                                 continue;
                             }
@@ -340,22 +341,22 @@ pub const Runner = struct {
                             const name_expr = try self.allocator.create(Expression);
                             name_expr.* = Expression{
                                 .literal = Literal{
-                                    .number = @floatFromInt(0),
+                                    .integer = 0,
                                 },
                             };
 
-                            for (0..repeat_count) |i| {
+                            for (0..@as(usize, @intCast(repeat_count))) |i| {
                                 if (variables.getPtr(name)) |existing| {
                                     existing.*.* = Expression{
                                         .literal = Literal{
-                                            .number = @floatFromInt(i),
+                                            .integer = @as(i32, @intCast(i)),
                                         },
                                     };
                                 } else {
                                     try variables.put(name, name_expr);
                                     name_expr.* = Expression{
                                         .literal = Literal{
-                                            .number = @floatFromInt(i),
+                                            .integer = @as(i32, @intCast(i)),
                                         },
                                     };
                                 }
@@ -411,7 +412,7 @@ pub const Runner = struct {
                 const array_expr = try self.evaluate_expression(indexing.array.*, variables);
                 const index_expr = try self.evaluate_expression(indexing.index.*, variables);
 
-                const index = @as(usize, @intFromFloat(index_expr.literal.number));
+                const index = @as(usize, @intCast(index_expr.literal.integer));
                 switch (array_expr.literal) {
                     .array => |a| {
                         if (index < a.items.len) {
@@ -428,7 +429,7 @@ pub const Runner = struct {
                     },
                     .string => |s| {
                         if (index < s.len) {
-                            return Expression{ .literal = .{ .number = @floatFromInt(s[index]) } };
+                            return Expression{ .literal = .{ .integer = @as(i32, @intCast(s[index])) } };
                         } else {
                             try self.stderr.print("Index out of bounds: {d} for string of length {d}\n", .{
                                 index,
@@ -469,9 +470,36 @@ pub const Runner = struct {
 
                 return switch (binary.operator.token_type) {
                     .Plus => switch (left.literal) {
-                        .number => Expression{
-                            .literal = Literal{
-                                .number = left.literal.number + right.literal.number,
+                        .integer => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .integer = left.literal.integer + right.literal.integer,
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .float = @as(f32, @floatFromInt(left.literal.integer)) + right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '+' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            },
+                        },
+                        .float => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .float = left.literal.float + @as(f32, @floatFromInt(right.literal.integer)),
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .float = left.literal.float + right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '+' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
                             },
                         },
                         .string => Expression{
@@ -487,35 +515,169 @@ pub const Runner = struct {
                             std.process.exit(1);
                         },
                     },
-                    .Minus => Expression{
-                        .literal = Literal{
-                            .number = left.literal.number - right.literal.number,
+                    .Minus => switch (left.literal) {
+                        .integer => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .integer = left.literal.integer - right.literal.integer,
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .float = @as(f32, @floatFromInt(left.literal.integer)) - right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '-' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            },
+                        },
+                        .float => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .float = left.literal.float - @as(f32, @floatFromInt(right.literal.integer)),
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .float = left.literal.float - right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '-' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            },
+                        },
+                        else => {
+                            try self.stderr.print("Invalid left operand for '-' operator: {s}\n", .{try left.literal.to_string(self.allocator, self)});
+                            std.process.exit(1);
                         },
                     },
-                    .Multiply => Expression{
-                        .literal = Literal{
-                            .number = left.literal.number * right.literal.number,
+                    .Multiply => switch (left.literal) {
+                        .integer => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .integer = left.literal.integer * right.literal.integer,
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .float = @as(f32, @floatFromInt(left.literal.integer)) * right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '*' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            },
+                        },
+                        .float => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .float = left.literal.float * @as(f32, @floatFromInt(right.literal.integer)),
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .float = left.literal.float * right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '*' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            },
+                        },
+                        else => {
+                            try self.stderr.print("Invalid left operand for '*' operator: {s}\n", .{try left.literal.to_string(self.allocator, self)});
+                            std.process.exit(1);
                         },
                     },
                     .Divide => {
-                        if (right.literal.number == 0) {
+                        if ((right.literal == .integer and right.literal.integer == 0) or (right.literal == .float and right.literal.float == 0.0)) {
                             try self.stderr.print("Division by zero error\n", .{});
                             std.process.exit(1);
                         }
-                        return Expression{
-                            .literal = Literal{
-                                .number = left.literal.number / right.literal.number,
+
+                        return switch (left.literal) {
+                            .integer => switch (right.literal) {
+                                .integer => Expression{
+                                    .literal = Literal{
+                                        .integer = @divTrunc(left.literal.integer, right.literal.integer),
+                                    },
+                                },
+                                .float => Expression{
+                                    .literal = Literal{
+                                        .float = @as(f32, @floatFromInt(left.literal.integer)) / right.literal.float,
+                                    },
+                                },
+                                else => {
+                                    try self.stderr.print("Invalid right operand for '/' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                    std.process.exit(1);
+                                },
+                            },
+                            .float => switch (right.literal) {
+                                .integer => Expression{
+                                    .literal = Literal{
+                                        .float = left.literal.float / @as(f32, @floatFromInt(right.literal.integer)),
+                                    },
+                                },
+                                .float => Expression{
+                                    .literal = Literal{
+                                        .float = left.literal.float / right.literal.float,
+                                    },
+                                },
+                                else => {
+                                    try self.stderr.print("Invalid right operand for '/' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                    std.process.exit(1);
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid left operand for '/' operator: {s}\n", .{try left.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
                             },
                         };
                     },
                     .Modulo => {
-                        if (right.literal.number == 0) {
+                        if ((right.literal == .integer and right.literal.integer == 0) or (right.literal == .float and right.literal.float == 0.0)) {
                             try self.stderr.print("Modulo by zero error\n", .{});
                             std.process.exit(1);
                         }
-                        return Expression{
-                            .literal = Literal{
-                                .number = @mod(left.literal.number, right.literal.number),
+
+                        return switch (left.literal) {
+                            .integer => switch (right.literal) {
+                                .integer => Expression{
+                                    .literal = Literal{
+                                        .integer = @mod(left.literal.integer, right.literal.integer),
+                                    },
+                                },
+                                .float => Expression{
+                                    .literal = Literal{
+                                        .float = @mod(@as(f32, @floatFromInt(left.literal.integer)), right.literal.float),
+                                    },
+                                },
+                                else => {
+                                    try self.stderr.print("Invalid right operand for '%' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                    std.process.exit(1);
+                                },
+                            },
+                            .float => switch (right.literal) {
+                                .integer => Expression{
+                                    .literal = Literal{
+                                        .float = @mod(left.literal.float, @as(f32, @floatFromInt(right.literal.integer))),
+                                    },
+                                },
+                                .float => Expression{
+                                    .literal = Literal{
+                                        .float = @mod(left.literal.float, right.literal.float),
+                                    },
+                                },
+                                else => {
+                                    try self.stderr.print("Invalid right operand for '%' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                    std.process.exit(1);
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid left operand for '%' operator: {s}\n", .{try left.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
                             },
                         };
                     },
@@ -529,14 +691,80 @@ pub const Runner = struct {
                             .boolean = !try left.equals(right, self),
                         },
                     },
-                    .GreaterThan => Expression{
-                        .literal = Literal{
-                            .boolean = left.literal.number > right.literal.number,
+                    .GreaterThan => switch (left.literal) {
+                        .integer => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .boolean = left.literal.integer > right.literal.integer,
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .boolean = @as(f32, @floatFromInt(left.literal.integer)) > right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '>' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            },
+                        },
+                        .float => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .boolean = left.literal.float > @as(f32, @floatFromInt(right.literal.integer)),
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .boolean = left.literal.float > right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '>' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            },
+                        },
+                        else => {
+                            try self.stderr.print("Invalid left operand for '>' operator: {s}\n", .{try left.literal.to_string(self.allocator, self)});
+                            std.process.exit(1);
                         },
                     },
-                    .LessThan => Expression{
-                        .literal = Literal{
-                            .boolean = left.literal.number < right.literal.number,
+                    .LessThan => switch (left.literal) {
+                        .integer => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .boolean = left.literal.integer < right.literal.integer,
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .boolean = @as(f32, @floatFromInt(left.literal.integer)) < right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '<' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            },
+                        },
+                        .float => switch (right.literal) {
+                            .integer => Expression{
+                                .literal = Literal{
+                                    .boolean = left.literal.float < @as(f32, @floatFromInt(right.literal.integer)),
+                                },
+                            },
+                            .float => Expression{
+                                .literal = Literal{
+                                    .boolean = left.literal.float < right.literal.float,
+                                },
+                            },
+                            else => {
+                                try self.stderr.print("Invalid right operand for '<' operator: {s}\n", .{try right.literal.to_string(self.allocator, self)});
+                                std.process.exit(1);
+                            },
+                        },
+                        else => {
+                            try self.stderr.print("Invalid left operand for '<' operator: {s}\n", .{try left.literal.to_string(self.allocator, self)});
+                            std.process.exit(1);
                         },
                     },
                     .Or => Expression{
@@ -562,25 +790,89 @@ pub const Runner = struct {
                 switch (module_expr.literal) {
                     .module => {
                         const module = module_expr.literal.module;
-
-                        const attribute = ga.attribute.identifier;
-
-                        if (module.constants.get(attribute.name)) |value| {
-                            return value;
-                        } else if (module.functions.get(attribute.name)) |handler| {
-                            return Expression{
-                                .literal = .{
-                                    .function = .{
-                                        .name = attribute.name,
-                                        .handler = .{
-                                            .native = handler,
+                        switch (ga.attribute.*) {
+                            .identifier => |attribute| {
+                                if (module.constants.get(attribute.name)) |value| {
+                                    return value;
+                                } else if (module.functions.get(attribute.name)) |handler| {
+                                    return Expression{
+                                        .literal = .{
+                                            .function = .{
+                                                .name = attribute.name,
+                                                .handler = .{
+                                                    .native = handler,
+                                                },
+                                            },
                                         },
+                                    };
+                                } else {
+                                    try self.stderr.print("Module '{s}' has no attribute '{s}'\n", .{ module.name, attribute.name });
+                                    std.process.exit(1);
+                                }
+                            },
+                            .literal => |literal| {
+                                if (literal != .custom) {
+                                    try self.stderr.print("Expected a custom type attribute, got: {s}\n", .{try literal.to_string(self.allocator, self)});
+                                    std.process.exit(1);
+                                }
+
+                                // const custom: Custom = literal.custom;
+
+                                // const corr_type = try self.allocator.create(Expression);
+                                // corr_type.* = Expression{
+                                //     .get_attribute = .{
+                                //         .object = &module_expr,
+                                //         .attribute = custom.corr_type,
+                                //     },
+                                // };
+
+                                // const lit = try self.allocator.create(Literal);
+                                // lit.* = Literal{
+                                //     .custom = .{
+                                //         .corr_type = corr_type,
+                                //         .values = custom.values,
+                                //     },
+                                // };
+
+                                const custom = try self.allocator.create(Custom);
+                                const corr_type = try self.allocator.create(Expression);
+                                corr_type.* = Expression{
+                                    .get_attribute = .{
+                                        .object = &module_expr,
+                                        .attribute = literal.custom.corr_type,
                                     },
-                                },
-                            };
-                        } else {
-                            try self.stderr.print("Module '{s}' has no attribute '{s}'\n", .{ module.name, attribute.name });
-                            std.process.exit(1);
+                                };
+
+                                custom.* = Custom{
+                                    .corr_type = corr_type,
+                                    .values = literal.custom.values,
+                                };
+
+                                const final_expr = try self.allocator.create(Expression);
+                                final_expr.* = Expression{
+                                    .literal = Literal{
+                                        .custom = custom.*,
+                                    },
+                                };
+
+                                return final_expr.*;
+
+                                // return Expression{
+                                //     .literal = .{
+                                //         .custom = custom.*,
+                                //         // .custom = .{
+                                //         //     .corr_type = &.{
+                                //         //         .get_attribute = .{
+                                //         //             .object = &module_expr,
+                                //         //             .attribute = literal.custom.corr_type,
+                                //         //         },
+                                //         //     },
+                                //         //     .values = literal.custom.values,
+                                //         // },
+                                //     },
+                                // };
+                            },
+                            else => unreachable,
                         }
                     },
                     .custom => {
@@ -591,7 +883,7 @@ pub const Runner = struct {
                         if (custom.values.get(attribute.name)) |value| {
                             return value;
                         } else {
-                            try self.stderr.print("Custom type '{s}' has no attribute '{s}'\n", .{ custom.corr_type.name, attribute.name });
+                            try self.stderr.print("Custom type '{s}' has no attribute '{s}'\n", .{ try custom.corr_type.pretty_print(self.allocator), attribute.name });
                             std.process.exit(1);
                         }
                     },
@@ -602,8 +894,6 @@ pub const Runner = struct {
                 }
             },
             .custom => |custom| {
-                std.debug.print("Custom type: {s}\n", .{custom.corr_type.name});
-
                 return Expression{
                     .literal = Literal{
                         .custom = custom,

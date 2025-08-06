@@ -8,6 +8,8 @@ const Module = @import("mod.zig").Module;
 const Handler = @import("../runner.zig").Handler;
 
 const fs = @import("fs.zig");
+const make_fd_num = @import("utilities.zig").make_fd_num;
+const make_socket_t = @import("utilities.zig").make_socket_t;
 
 const native_os = @import("builtin").os.tag;
 
@@ -47,26 +49,16 @@ const SOCK_RDM = 4;
 const SOCK_SEQPACKET = 5;
 const SOCK_PACKET = 10;
 
-fn make_fd_num(sock: std.posix.socket_t) anyerror!f32 {
-    return switch (native_os) {
-        .windows => @floatFromInt(@as(usize, @intFromPtr(sock))),
-        else => @floatFromInt(sock),
-    };
-}
-
-fn make_socket_t(arg: Expression) anyerror!std.posix.socket_t {
-    return switch (native_os) {
-        .windows => @ptrFromInt(@as(u32, @intFromFloat(arg.literal.number))),
-        else => @intFromFloat(arg.literal.number),
-    };
-}
+const SHUT_RECV = 0;
+const SHUT_SEND = 1;
+const SHUT_BOTH = 2;
 
 pub fn socket(runner: Runner, args: []*Expression) anyerror!Expression {
-    try require(3, &.{ &.{.number}, &.{.number}, &.{.number} }, "socket", runner, args);
+    try require(3, &.{ &.{.integer}, &.{.integer}, &.{.integer} }, "socket", runner, args);
 
-    const domain: u32 = @intFromFloat(args[0].literal.number);
-    const _type: u32 = @intFromFloat(args[1].literal.number);
-    const protocol: u32 = @intFromFloat(args[2].literal.number);
+    const domain: u32 = @intCast(args[0].literal.integer);
+    const _type: u32 = @intCast(args[1].literal.integer);
+    const protocol: u32 = @intCast(args[2].literal.integer);
 
     const socket_fd = try std.posix.socket(domain, _type, protocol);
 
@@ -78,11 +70,11 @@ pub fn socket(runner: Runner, args: []*Expression) anyerror!Expression {
 }
 
 pub fn connect(runner: Runner, args: []*Expression) anyerror!Expression {
-    try require(3, &.{ &.{.number}, &.{.string}, &.{.number} }, "connect", runner, args);
+    try require(3, &.{ &.{.integer}, &.{.string}, &.{.integer} }, "connect", runner, args);
 
     const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
     const address_raw: []const u8 = args[1].literal.string;
-    const port_raw: u16 = @intFromFloat(args[2].literal.number);
+    const port_raw: u16 = @intCast(args[2].literal.integer);
 
     const port: [2]u8 = [_]u8{
         @as(u8, @intCast(port_raw >> 8)),
@@ -124,17 +116,17 @@ pub fn connect(runner: Runner, args: []*Expression) anyerror!Expression {
 
     return Expression{
         .literal = .{
-            .number = @floatFromInt(0), // Return 0 on success
+            .integer = 0, // Return 0 on success
         },
     };
 }
 
 pub fn bind(runner: Runner, args: []*Expression) anyerror!Expression {
-    try require(3, &.{ &.{.number}, &.{.string}, &.{.number} }, "bind", runner, args);
+    try require(3, &.{ &.{.integer}, &.{.string}, &.{.integer} }, "bind", runner, args);
 
     const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
     const address_raw: []const u8 = args[1].literal.string;
-    const port_raw: u16 = @intFromFloat(args[2].literal.number);
+    const port_raw: u16 = @intCast(args[2].literal.integer);
 
     const port: [2]u8 = [_]u8{
         @as(u8, @intCast(port_raw >> 8)),
@@ -175,16 +167,16 @@ pub fn bind(runner: Runner, args: []*Expression) anyerror!Expression {
 
     return Expression{
         .literal = .{
-            .number = @floatFromInt(0), // Return 0 on success
+            .integer = 0, // Return 0 on success
         },
     };
 }
 
 pub fn listen(runner: Runner, args: []*Expression) anyerror!Expression {
-    try require(2, &.{ &.{.number}, &.{.number} }, "listen", runner, args);
+    try require(2, &.{ &.{.integer}, &.{.integer} }, "listen", runner, args);
 
     const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
-    const backlog: u31 = @intFromFloat(args[1].literal.number);
+    const backlog: u31 = @intCast(args[1].literal.integer);
 
     try std.posix.listen(sockfd, backlog);
 
@@ -192,7 +184,7 @@ pub fn listen(runner: Runner, args: []*Expression) anyerror!Expression {
 }
 
 pub fn accept(runner: Runner, args: []*Expression) anyerror!Expression {
-    try require(4, &.{ &.{.number}, &.{.string}, &.{.number}, &.{.number} }, "accept", runner, args);
+    try require(4, &.{ &.{.integer}, &.{.string}, &.{.integer}, &.{.integer} }, "accept", runner, args);
 
     const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
     var sockaddr: std.c.sockaddr = undefined;
@@ -202,10 +194,41 @@ pub fn accept(runner: Runner, args: []*Expression) anyerror!Expression {
 
     return Expression{
         .literal = .{
-            .number = try make_fd_num(client_fd),
+            .integer = try make_fd_num(client_fd),
         },
     };
-    // return Expression{ .literal = .{ .number = @floatFromInt(client_fd) } };
+}
+
+pub fn shutdown(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(2, &.{ &.{.integer}, &.{.integer} }, "shutdown", runner, args);
+
+    const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
+    const how: u32 = @intCast(args[1].literal.integer);
+
+    try std.posix.shutdown(sockfd, switch (how) {
+        SHUT_RECV => .recv,
+        SHUT_SEND => .send,
+        SHUT_BOTH => .both,
+        else => return error.InvalidShutdownType,
+    });
+
+    return Expression{ .literal = .{ .null = null } };
+}
+
+pub fn send(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(3, &.{ &.{.integer}, &.{.string}, &.{.integer} }, "send", runner, args);
+
+    const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
+    const data: []const u8 = args[1].literal.string;
+    const flags: u32 = @intCast(args[2].literal.integer);
+
+    const bytes_sent = try std.posix.send(sockfd, data, flags);
+
+    return Expression{
+        .literal = .{
+            .integer = @intCast(bytes_sent),
+        },
+    };
 }
 
 pub const Socket = Module{
@@ -217,28 +240,35 @@ pub const Socket = Module{
         .{ "bind", &bind },
         .{ "listen", &listen },
         .{ "accept", &accept },
+        .{ "shutdown", &shutdown },
+        .{ "send", &send },
     }),
     .constants = std.StaticStringMap(Expression).initComptime(.{
         // Address families
-        .{ "AF_UNSPEC", Expression{ .literal = .{ .number = @floatFromInt(AF_UNSPEC) } } },
-        .{ "AF_UNIX", Expression{ .literal = .{ .number = @floatFromInt(AF_UNIX) } } },
-        .{ "AF_INET", Expression{ .literal = .{ .number = @floatFromInt(AF_INET) } } },
-        .{ "AF_AX25", Expression{ .literal = .{ .number = @floatFromInt(AF_AX25) } } },
-        .{ "AF_IPX", Expression{ .literal = .{ .number = @floatFromInt(AF_IPX) } } },
-        .{ "AF_APPLETALK", Expression{ .literal = .{ .number = @floatFromInt(AF_APPLETALK) } } },
-        .{ "AF_NETROM", Expression{ .literal = .{ .number = @floatFromInt(AF_NETROM) } } },
-        .{ "AF_BRIDGE", Expression{ .literal = .{ .number = @floatFromInt(AF_BRIDGE) } } },
-        .{ "AF_AAL5", Expression{ .literal = .{ .number = @floatFromInt(AF_AAL5) } } },
-        .{ "AF_X25", Expression{ .literal = .{ .number = @floatFromInt(AF_X25) } } },
-        .{ "AF_INET6", Expression{ .literal = .{ .number = @floatFromInt(AF_INET6) } } },
-        .{ "AF_MAX", Expression{ .literal = .{ .number = @floatFromInt(AF_MAX) } } },
+        .{ "AF_UNSPEC", Expression{ .literal = .{ .integer = AF_UNSPEC } } },
+        .{ "AF_UNIX", Expression{ .literal = .{ .integer = AF_UNIX } } },
+        .{ "AF_INET", Expression{ .literal = .{ .integer = AF_INET } } },
+        .{ "AF_AX25", Expression{ .literal = .{ .integer = AF_AX25 } } },
+        .{ "AF_IPX", Expression{ .literal = .{ .integer = AF_IPX } } },
+        .{ "AF_APPLETALK", Expression{ .literal = .{ .integer = AF_APPLETALK } } },
+        .{ "AF_NETROM", Expression{ .literal = .{ .integer = AF_NETROM } } },
+        .{ "AF_BRIDGE", Expression{ .literal = .{ .integer = AF_BRIDGE } } },
+        .{ "AF_AAL5", Expression{ .literal = .{ .integer = AF_AAL5 } } },
+        .{ "AF_X25", Expression{ .literal = .{ .integer = AF_X25 } } },
+        .{ "AF_INET6", Expression{ .literal = .{ .integer = AF_INET6 } } },
+        .{ "AF_MAX", Expression{ .literal = .{ .integer = AF_MAX } } },
 
         // Socket types
-        .{ "SOCK_STREAM", Expression{ .literal = .{ .number = @floatFromInt(SOCK_STREAM) } } },
-        .{ "SOCK_DGRAM", Expression{ .literal = .{ .number = @floatFromInt(SOCK_DGRAM) } } },
-        .{ "SOCK_RAW", Expression{ .literal = .{ .number = @floatFromInt(SOCK_RAW) } } },
-        .{ "SOCK_RDM", Expression{ .literal = .{ .number = @floatFromInt(SOCK_RDM) } } },
-        .{ "SOCK_SEQPACKET", Expression{ .literal = .{ .number = @floatFromInt(SOCK_SEQPACKET) } } },
-        .{ "SOCK_PACKET", Expression{ .literal = .{ .number = @floatFromInt(SOCK_PACKET) } } },
+        .{ "SOCK_STREAM", Expression{ .literal = .{ .integer = SOCK_STREAM } } },
+        .{ "SOCK_DGRAM", Expression{ .literal = .{ .integer = SOCK_DGRAM } } },
+        .{ "SOCK_RAW", Expression{ .literal = .{ .integer = SOCK_RAW } } },
+        .{ "SOCK_RDM", Expression{ .literal = .{ .integer = SOCK_RDM } } },
+        .{ "SOCK_SEQPACKET", Expression{ .literal = .{ .integer = SOCK_SEQPACKET } } },
+        .{ "SOCK_PACKET", Expression{ .literal = .{ .integer = SOCK_PACKET } } },
+
+        // Shutdown types
+        .{ "SHUT_RECV", Expression{ .literal = .{ .integer = SHUT_RECV } } },
+        .{ "SHUT_SEND", Expression{ .literal = .{ .integer = SHUT_SEND } } },
+        .{ "SHUT_BOTH", Expression{ .literal = .{ .integer = SHUT_BOTH } } },
     }),
 };
