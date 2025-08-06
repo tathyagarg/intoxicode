@@ -4,6 +4,7 @@ const Expression = @import("../../parser/expressions.zig").Expression;
 const Runner = @import("../runner.zig").Runner;
 const require = @import("../runner.zig").require;
 const socket = @import("socket.zig");
+const fs = @import("fs.zig");
 const utilities = @import("utilities.zig");
 
 const CustomType = @import("../../parser/parser.zig").expressions.CustomType;
@@ -17,6 +18,27 @@ const GET = "GET";
 const POST = "POST";
 const PUT = "PUT";
 const DELETE = "DELETE";
+
+fn make_http_corr_type(runner: Runner, name: []const u8) anyerror!Expression {
+    const corr_type_object = try runner.allocator.create(Expression);
+    corr_type_object.* = Expression{
+        .literal = .{
+            .module = Http,
+        },
+    };
+
+    const corr_type_attribute = try runner.allocator.create(Expression);
+    corr_type_attribute.* = Expression{
+        .identifier = .{ .name = name },
+    };
+
+    return Expression{
+        .get_attribute = .{
+            .object = corr_type_object,
+            .attribute = corr_type_attribute,
+        },
+    };
+}
 
 fn Header(runner: Runner) !CustomType {
     var fields = std.StringHashMap(LiteralType).init(runner.allocator);
@@ -67,25 +89,8 @@ pub fn request_from_data(runner: Runner, args: []*Expression) anyerror!Expressio
     try values.put("headers", Expression{ .literal = .{ .array = std.ArrayList(Expression).init(runner.allocator) } });
     try values.put("body", Expression{ .literal = .{ .string = "" } });
 
-    const request_object = try runner.allocator.create(Expression);
-    request_object.* = Expression{
-        .literal = .{
-            .module = Http,
-        },
-    };
-
-    const request_name = try runner.allocator.create(Expression);
-    request_name.* = Expression{
-        .identifier = .{ .name = "Request" },
-    };
-
-    request_name.* = Expression{ .get_attribute = .{
-        .object = request_object,
-        .attribute = request_name,
-    } };
-
     const request = Custom{
-        .corr_type = request_name,
+        .corr_type = &try make_http_corr_type(runner, "Request"),
         .values = values,
     };
 
@@ -203,30 +208,10 @@ pub fn get(runner: Runner, args: []*Expression) anyerror!Expression {
 
     const request = try runner.allocator.create(Expression);
 
-    const corr_type_object = try runner.allocator.create(Expression);
-    corr_type_object.* = Expression{
-        .literal = .{
-            .module = Http,
-        },
-    };
-
-    const corr_type_attribute = try runner.allocator.create(Expression);
-    corr_type_attribute.* = Expression{
-        .identifier = .{ .name = "Request" },
-    };
-
-    const corr_type = try runner.allocator.create(Expression);
-    corr_type.* = Expression{
-        .get_attribute = .{
-            .object = corr_type_object,
-            .attribute = corr_type_attribute,
-        },
-    };
-
     request.* = Expression{
         .literal = .{
             .custom = .{
-                .corr_type = corr_type,
+                .corr_type = &try make_http_corr_type(runner, "Request"),
                 .values = std.StringHashMap(Expression).init(runner.allocator),
             },
         },
@@ -240,14 +225,122 @@ pub fn get(runner: Runner, args: []*Expression) anyerror!Expression {
 
     const request_text = try make_request_data(
         runner,
-        @as([]*Expression, @ptrCast(@constCast(&[_]*Expression{request}))),
+        @ptrCast(@constCast(&[_]*Expression{request})),
     );
-    std.debug.print("GET request data: {s}\n", .{request_text.literal.string});
 
-    _ = .{fd};
-    // std.posix.send()
+    _ = try std.posix.write(fd, request_text.literal.string);
+    try std.posix.shutdown(fd, .send);
 
-    return request.*;
+    var response_data = std.ArrayList(u8).init(runner.allocator);
+
+    const fd_arg = try runner.allocator.create(Expression);
+    fd_arg.* = Expression{ .literal = .{ .integer = try utilities.make_fd_num(fd) } };
+
+    const chunk_size_arg = try runner.allocator.create(Expression);
+    chunk_size_arg.* = Expression{ .literal = .{ .integer = 512 } };
+
+    const resp = try fs.read_full_buffer(
+        runner,
+        @ptrCast(@constCast(&[_]*Expression{
+            fd_arg,
+            chunk_size_arg,
+        })),
+    );
+
+    try response_data.appendSlice(resp.literal.string);
+
+    const result = try response_data.toOwnedSlice();
+
+    return Expression{ .literal = .{
+        .string = result,
+    } };
+}
+
+pub fn post(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(4, &.{ &.{.integer}, &.{.string}, &.{.array}, &.{.string} }, "post", runner, args);
+
+    const fd: std.posix.socket_t = try utilities.make_socket_t(args[0].*);
+    const url = args[1].literal.string;
+    const headers = args[2];
+    const body = args[3];
+
+    for (headers.*.literal.array.items) |header| {
+        if (std.mem.eql(u8, header.literal.custom.values.get("name").?.literal.string, "Content-Length")) {
+            break;
+        }
+    } else {
+        const content_length: i32 = @intCast(body.literal.string.len);
+        const content_length_header = try runner.allocator.create(Expression);
+        content_length_header.* = Expression{
+            .literal = .{
+                .custom = Custom{
+                    .corr_type = &try make_http_corr_type(runner, "Header"),
+                    .values = std.StringHashMap(Expression).init(runner.allocator),
+                },
+            },
+        };
+
+        try content_length_header.literal.custom.values.put("name", Expression{ .literal = .{ .string = "Content-Length" } });
+        try content_length_header.literal.custom.values.put(
+            "value",
+            Expression{
+                .literal = .{
+                    .string = try std.fmt.allocPrint(runner.allocator, "{}", .{content_length}),
+                },
+            },
+        );
+
+        try headers.*.literal.array.append(content_length_header.*);
+    }
+
+    const request = try runner.allocator.create(Expression);
+
+    request.* = Expression{
+        .literal = .{
+            .custom = .{
+                .corr_type = &try make_http_corr_type(runner, "Request"),
+                .values = std.StringHashMap(Expression).init(runner.allocator),
+            },
+        },
+    };
+
+    try request.literal.custom.values.put("method", Expression{ .literal = .{ .string = GET } });
+    try request.literal.custom.values.put("url", Expression{ .literal = .{ .string = url } });
+    try request.literal.custom.values.put("protocol", Expression{ .literal = .{ .string = "HTTP/1.1" } });
+    try request.literal.custom.values.put("headers", headers.*);
+    try request.literal.custom.values.put("body", body.*);
+
+    const request_text = try make_request_data(
+        runner,
+        @ptrCast(@constCast(&[_]*Expression{request})),
+    );
+
+    _ = try std.posix.write(fd, request_text.literal.string);
+    try std.posix.shutdown(fd, .send);
+
+    var response_data = std.ArrayList(u8).init(runner.allocator);
+
+    const fd_arg = try runner.allocator.create(Expression);
+    fd_arg.* = Expression{ .literal = .{ .integer = try utilities.make_fd_num(fd) } };
+
+    const chunk_size_arg = try runner.allocator.create(Expression);
+    chunk_size_arg.* = Expression{ .literal = .{ .integer = 512 } };
+
+    const resp = try fs.read_full_buffer(
+        runner,
+        @ptrCast(@constCast(&[_]*Expression{
+            fd_arg,
+            chunk_size_arg,
+        })),
+    );
+
+    try response_data.appendSlice(resp.literal.string);
+
+    const result = try response_data.toOwnedSlice();
+
+    return Expression{ .literal = .{
+        .string = result,
+    } };
 }
 
 pub const Http = Module{
@@ -256,12 +349,13 @@ pub const Http = Module{
         .{ "request_from_data", &request_from_data },
         .{ "make_request_data", &make_request_data },
         .{ "get", &get },
+        .{ "post", &post },
     }),
     .constants = std.StaticStringMap(Expression).initComptime(.{
-        // .{ "get", Expression{ .literal = .{ .string = GET } } },
-        .{ "post", Expression{ .literal = .{ .string = POST } } },
-        .{ "put", Expression{ .literal = .{ .string = PUT } } },
-        .{ "delete", Expression{ .literal = .{ .string = DELETE } } },
+        .{ "GET", Expression{ .literal = .{ .string = GET } } },
+        .{ "POST", Expression{ .literal = .{ .string = POST } } },
+        .{ "PUT", Expression{ .literal = .{ .string = PUT } } },
+        .{ "DELETE", Expression{ .literal = .{ .string = DELETE } } },
     }),
     .customs = std.StaticStringMap(*const fn (Runner) anyerror!CustomType).initComptime(.{
         .{ "Request", &Request },
