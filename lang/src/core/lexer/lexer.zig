@@ -158,41 +158,38 @@ pub const Lexer = struct {
             '"' => {
                 self.advance(); // Consume the opening quote
 
-                const start = self.position;
-                while (!self.at_end() and self.current_char != '"') self.advance();
-                const end = self.position;
-
-                if (self.current_char != '"') {
-                    return error.UnterminatedString; // Unterminated string literal
-                }
-
-                const content = self.input[start - 1 .. end - 1];
+                // const start = self.position;
 
                 var result = std.ArrayList(u8).init(self.allocator);
                 defer result.deinit();
 
-                var curr_index = 0;
-                var curr_char: u8 = 0;
-
-                while (curr_index < content.len) : (curr_char = content[curr_index]) {
-                    if (curr_char == '\\') {
-                        curr_index += 1;
-                        if (curr_index >= content.len) {
+                while (!self.at_end()) {
+                    if (self.current_char == '\\') {
+                        self.advance();
+                        if (self.at_end()) {
+                            std.debug.print("Invalid escape sequence at end of string\n", .{});
                             return error.InvalidEscapeSequence;
                         }
-                        curr_char = content[curr_index];
-                        switch (curr_char) {
-                            'n' => result.append(10),
-                            'r' => result.append(13),
-                            '0' => result.append(0),
-                            '"' => result.append(34),
-                            '\\' => result.append(92),
-                            else => return error.InvalidEscapeSequence,
-                        }
+
+                        try result.append(switch (self.current_char) {
+                            'n' => 10,
+                            'r' => 13,
+                            '0' => 0,
+                            '"' => 34,
+                            '\\' => 92,
+                            else => {
+                                std.debug.print("Invalid escape sequence: '\\{c}'\n", .{self.current_char});
+                                return error.InvalidEscapeSequence;
+                            },
+                        });
+                        self.advance();
                     } else {
-                        result.append(curr_char);
+                        if (self.current_char == '"') {
+                            break;
+                        }
+                        try result.append(self.current_char);
+                        self.advance();
                     }
-                    curr_index += 1;
                 }
 
                 try self.add_raw_token(Token.init(TokenType.String, try result.toOwnedSlice()));

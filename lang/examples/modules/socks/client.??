@@ -15,7 +15,7 @@ resp = http ~ post(
       value -> "text/plain"
     }
   ],
-  "awesome data"
+  "{\"message\": \"Hello, World!\"}"
 )
 
 scream(resp)
