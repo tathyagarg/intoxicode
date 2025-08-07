@@ -71,6 +71,11 @@ const paths: Record<string, Path> = {
     name: 'Imports',
     level: 2,
     prev: 'directives',
+    next: 'objects',
+  },
+  'objects': {
+    name: 'Objects',
+    prev: 'imports',
     next: 'stdlib',
   },
   'stdlib': {
@@ -82,7 +87,19 @@ const paths: Record<string, Path> = {
     name: 'fs',
     level: 2,
     prev: 'stdlib',
-  }
+    next: 'socket',
+  },
+  'socket': {
+    name: 'socket',
+    level: 2,
+    prev: 'fs',
+    next: 'http'
+  },
+  'http': {
+    name: 'http',
+    level: 2,
+    prev: 'socket',
+  },
 }
 
 export default paths;

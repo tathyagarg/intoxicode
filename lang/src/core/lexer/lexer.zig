@@ -167,22 +167,35 @@ pub const Lexer = struct {
                 }
 
                 const content = self.input[start - 1 .. end - 1];
-                const no_lf_size = std.mem.replacementSize(u8, content, "\\n", &[_]u8{10});
-                const no_lf_out = try self.allocator.alloc(u8, no_lf_size);
 
-                _ = std.mem.replace(u8, content, "\\n", &[_]u8{10}, no_lf_out);
+                var result = std.ArrayList(u8).init(self.allocator);
+                defer result.deinit();
 
-                const no_cr_size = std.mem.replacementSize(u8, no_lf_out, "\\r", &[_]u8{13});
-                const no_cr_out = try self.allocator.alloc(u8, no_cr_size);
+                var curr_index = 0;
+                var curr_char: u8 = 0;
 
-                _ = std.mem.replace(u8, no_lf_out, "\\r", &[_]u8{13}, no_cr_out);
+                while (curr_index < content.len) : (curr_char = content[curr_index]) {
+                    if (curr_char == '\\') {
+                        curr_index += 1;
+                        if (curr_index >= content.len) {
+                            return error.InvalidEscapeSequence;
+                        }
+                        curr_char = content[curr_index];
+                        switch (curr_char) {
+                            'n' => result.append(10),
+                            'r' => result.append(13),
+                            '0' => result.append(0),
+                            '"' => result.append(34),
+                            '\\' => result.append(92),
+                            else => return error.InvalidEscapeSequence,
+                        }
+                    } else {
+                        result.append(curr_char);
+                    }
+                    curr_index += 1;
+                }
 
-                const no_zero_size = std.mem.replacementSize(u8, no_cr_out, "\\0", &[_]u8{0});
-                const no_zero_out = try self.allocator.alloc(u8, no_zero_size);
-
-                _ = std.mem.replace(u8, no_cr_out, "\\0", &[_]u8{0}, no_zero_out);
-
-                try self.add_raw_token(Token.init(TokenType.String, no_zero_out));
+                try self.add_raw_token(Token.init(TokenType.String, try result.toOwnedSlice()));
                 //std.debug.print("String: {s}\n", .{self.tokens.items[self.tokens.items.len - 1].value});
             },
             '0'...'9' => try self.add_token(try self.number()),

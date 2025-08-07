@@ -32,7 +32,9 @@
   onMount(async () => {
     const renderer = new marked.Renderer();
     renderer.link = ({ href, title, text }) =>
-      `<a href="${href}" ${title ? 'title="' + title + '"' : ""} data-sveltekit-reload>${text}</a>`;
+      text[0] == "`" && text[text.length - 1] == "`"
+        ? `<a href="${href}" ${title ? 'title="' + title + '"' : ""} data-sveltekit-reload><code>${text.slice(1, -1)}</code></a>`
+        : `<a href="${href}" ${title ? 'title="' + title + '"' : ""} data-sveltekit-reload>${text}</a>`;
 
     marked.setOptions({
       renderer: renderer,

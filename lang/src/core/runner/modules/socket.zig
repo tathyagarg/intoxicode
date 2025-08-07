@@ -184,7 +184,7 @@ pub fn listen(runner: Runner, args: []*Expression) anyerror!Expression {
 }
 
 pub fn accept(runner: Runner, args: []*Expression) anyerror!Expression {
-    try require(4, &.{ &.{.integer}, &.{.string}, &.{.integer}, &.{.integer} }, "accept", runner, args);
+    try require(1, &.{&.{.integer}}, "accept", runner, args);
 
     const sockfd: std.posix.socket_t = try make_socket_t(args[0].*);
     var sockaddr: std.c.sockaddr = undefined;

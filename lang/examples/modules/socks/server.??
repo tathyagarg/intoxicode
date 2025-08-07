@@ -16,8 +16,7 @@ scream("Listening on port ", PORT, "\n")
 
 loop (true) {
   try {
-    # honestly idk what the params after fd are for
-    client = socket ~ accept(fd, "", 1, 2)
+    client = socket ~ accept(fd)
 
     client_msg = fs ~ read_full_buffer(client, 512)
     scream("MEOW?: ", client_msg, "\n")
