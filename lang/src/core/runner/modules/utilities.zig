@@ -4,7 +4,7 @@ const Expression = @import("../../parser/expressions.zig").Expression;
 
 pub fn make_fd_num(sock: std.posix.socket_t) anyerror!i32 {
     return switch (native_os) {
-        .windows => @as(i32, @intFromPtr(sock)),
+        .windows => @as(i32, @intCast(@intFromPtr(sock))),
         else => @intCast(sock),
     };
 }
