@@ -33,7 +33,7 @@ loop (true) {
 
     scream("Body ", request ~ body, "\n")
 
-    fs ~ write(client, "Meow")
+    fs ~ write(client, "HTTP/1.1 200 OK\r\n\r\nMeow")
     socket ~ shutdown(client, socket ~ SHUT_SEND)
   } gotcha {
       scream("Oopsie in processing request\n")

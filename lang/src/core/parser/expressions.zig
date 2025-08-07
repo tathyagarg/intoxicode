@@ -92,7 +92,6 @@ pub const Expression = union(enum) {
     pub fn pretty_print(self: Expression, allocator: std.mem.Allocator) anyerror![]const u8 {
         return switch (self) {
             .binary => {
-                std.debug.print("MEOWOWOWOWOOOOWOOWO\n\n\n\n\n", .{});
                 const left = try self.binary.left.pretty_print(allocator);
                 defer allocator.free(left);
 
@@ -180,7 +179,11 @@ pub const Expression = union(enum) {
                 var value_iter = c.values.iterator();
 
                 while (value_iter.next()) |field| {
-                    const field_str = field.key_ptr.*;
+                    const field_str = try std.fmt.allocPrint(
+                        allocator,
+                        "{s}: {s}",
+                        .{ field.key_ptr.*, try field.value_ptr.pretty_print(allocator) },
+                    );
                     try fields.append(field_str);
                 }
                 const result = try std.fmt.allocPrint(
@@ -344,7 +347,11 @@ pub const Literal = union(LiteralType) {
                 var value_iter = c.values.iterator();
 
                 while (value_iter.next()) |field| {
-                    const field_str = field.key_ptr.*;
+                    const field_str = try std.fmt.allocPrint(
+                        allocator,
+                        "{s}: {s}",
+                        .{ field.key_ptr.*, try field.value_ptr.pretty_print(allocator) },
+                    );
                     try fields.append(field_str);
                 }
                 const result = try std.fmt.allocPrint(

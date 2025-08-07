@@ -18,4 +18,4 @@ resp = http ~ post(
   "{\"message\": \"Hello, World!\"}"
 )
 
-scream(resp)
+scream(http ~ response_from_data(resp))

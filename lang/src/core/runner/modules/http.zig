@@ -199,6 +199,74 @@ pub fn make_request_data(runner: Runner, args: []*Expression) anyerror!Expressio
     return Expression{ .literal = .{ .string = try data.toOwnedSlice() } };
 }
 
+pub fn response_from_data(runner: Runner, args: []*Expression) anyerror!Expression {
+    try require(1, &.{&.{.string}}, "response_from_data", runner, args);
+
+    const data: []const u8 = args[0].literal.string;
+
+    var values = std.StringHashMap(Expression).init(runner.allocator);
+    try values.put("status_code", Expression{ .literal = .{ .integer = 200 } });
+    try values.put("headers", Expression{ .literal = .{ .array = std.ArrayList(Expression).init(runner.allocator) } });
+    try values.put("body", Expression{ .literal = .{ .string = "" } });
+
+    const response = Custom{
+        .corr_type = &try make_http_corr_type(runner, "Response"),
+        .values = values,
+    };
+
+    const status_code = values.getPtr("status_code").?;
+    const headers = values.getPtr("headers").?;
+    const body = values.getPtr("body").?;
+
+    var parts = std.mem.split(u8, data, "\r\n");
+    const status_line = parts.next() orelse return error.InvalidData;
+    var status_parts = std.mem.split(u8, status_line, " ");
+
+    _ = status_parts.next();
+
+    const status_code_str = status_parts.next() orelse return error.InvalidData;
+    const status_code_value = try std.fmt.parseInt(i32, status_code_str, 10);
+
+    status_code.* = Expression{ .literal = .{ .integer = status_code_value } };
+
+    const remaining_data = parts.rest();
+    var remaining_lines = std.mem.splitSequence(u8, remaining_data, "\r\n");
+
+    while (remaining_lines.next()) |header_line| {
+        if (header_line.len == 0) break;
+
+        var header_parts = std.mem.split(u8, header_line, ": ");
+
+        var header_data = std.StringHashMap(Expression).init(runner.allocator);
+        try header_data.put("name", Expression{ .literal = .{ .string = header_parts.next().? } });
+        try header_data.put("value", Expression{ .literal = .{ .string = header_parts.next().? } });
+
+        const header_name = try runner.allocator.create(Expression);
+        header_name.* = Expression{
+            .identifier = .{ .name = "Header" },
+        };
+
+        try headers.*.literal.array.append(Expression{
+            .literal = .{
+                .custom = Custom{
+                    .corr_type = header_name,
+                    .values = header_data,
+                },
+            },
+        });
+    }
+
+    if (remaining_lines.rest().len != 0) {
+        body.* = Expression{ .literal = .{ .string = remaining_lines.rest() } };
+    } else {
+        body.* = Expression{ .literal = .{ .null = null } };
+    }
+
+    return Expression{
+        .literal = .{ .custom = response },
+    };
+}
+
 pub fn get(runner: Runner, args: []*Expression) anyerror!Expression {
     try require(3, &.{ &.{.integer}, &.{.string}, &.{.array} }, "get", runner, args);
 
@@ -348,6 +416,7 @@ pub const Http = Module{
     .functions = std.StaticStringMap(Handler).initComptime(.{
         .{ "request_from_data", &request_from_data },
         .{ "make_request_data", &make_request_data },
+        .{ "response_from_data", &response_from_data },
         .{ "get", &get },
         .{ "post", &post },
     }),
