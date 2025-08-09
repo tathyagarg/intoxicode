@@ -1,12 +1,14 @@
-use rocket::response::Debug;
+use rocket::http::CookieJar;
 use rocket::response::{content, status};
+use rocket::serde::json::Json;
 use rocket::serde::{self, Deserialize, Serialize};
 
 use diesel::prelude::*;
 
+use crate::auth::verify_jwt;
 use crate::database::PackagesDb;
 
-type Result<T, E = Debug<diesel::result::Error>> = std::result::Result<T, E>;
+type Result<T, E = rocket::response::Debug<rocket::http::Status>> = std::result::Result<T, E>;
 
 #[derive(Queryable, Selectable, Serialize, Deserialize, Insertable)]
 #[serde(crate = "rocket::serde")]
@@ -15,12 +17,13 @@ struct Package {
     name: String,
     version: String,
     description: String,
+    author: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Insertable)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = packages)]
-struct PackageInsert {
+pub struct PackageInsert {
     name: String,
     version: String,
     description: String,
@@ -31,6 +34,7 @@ table! {
         name -> Text,
         version -> Text,
         description -> Text,
+        author -> Nullable<Text>,
     }
 }
 
@@ -69,5 +73,61 @@ pub async fn get_packages(
             serde::json::to_string(&data)
                 .unwrap_or_else(|_| "{\"error\": \"Serialization error\"}".to_string()),
         ),
+    ))
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(crate = "rocket::serde")]
+pub struct CreatePackageData {
+    token: String,
+    package_data: PackageInsert,
+}
+
+#[post("/packages", data = "<package_data>")]
+pub async fn create_package(
+    db: PackagesDb,
+    package_data: Json<PackageInsert>,
+    cookies: &CookieJar<'_>,
+) -> Result<status::Custom<content::RawJson<String>>> {
+    let token = cookies
+        .get("auth_token")
+        .map(|cookie| cookie.value().to_string())
+        .unwrap_or_else(|| "".to_string());
+
+    let verification_result = verify_jwt(&token);
+
+    if verification_result.is_err() {
+        return Ok(status::Custom(
+            rocket::http::Status::Unauthorized,
+            content::RawJson("{\"error\": \"Invalid or expired token\"}".to_string()),
+        ));
+    }
+
+    let author_username = verification_result.unwrap();
+
+    let package = Package {
+        name: package_data.name.clone(),
+        version: package_data.version.clone(),
+        description: package_data.description.clone(),
+        author: Some(author_username.clone()),
+    };
+
+    let res = db
+        .run(move |conn| {
+            diesel::insert_into(packages::table)
+                .values(&package)
+                .execute(conn)
+        })
+        .await;
+
+    if res.is_err() {
+        return Err(rocket::response::Debug(
+            rocket::http::Status::InternalServerError,
+        ));
+    }
+
+    Ok(status::Custom(
+        rocket::http::Status::Created,
+        content::RawJson("{\"message\": \"Package created successfully\"}".to_string()),
     ))
 }

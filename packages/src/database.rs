@@ -34,7 +34,10 @@ pub fn stage() -> AdHoc {
         rocket
             .attach(PackagesDb::fairing())
             .attach(AdHoc::on_ignite("Run Migrations", run_migrations))
-            .mount("/", routes![packages::get_packages])
+            .mount(
+                "/",
+                routes![packages::get_packages, packages::create_package],
+            )
             .mount("/auth", routes![auth::signup, auth::login])
     })
 }

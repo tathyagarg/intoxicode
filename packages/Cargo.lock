@@ -286,6 +286,12 @@ dependencies = [
 
 [[package]]
 name = "base64"
+version = "0.13.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
+
+[[package]]
+name = "base64"
 version = "0.21.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
@@ -1324,6 +1330,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "jwt"
+version = "0.16.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6204285f77fe7d9784db3fdc449ecce1a0114927a51d5a41c4c7a292011c015f"
+dependencies = [
+ "base64 0.13.1",
+ "crypto-common",
+ "digest",
+ "hmac",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
 name = "kv-log-macro"
 version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1624,10 +1645,13 @@ dependencies = [
  "argon2",
  "diesel",
  "diesel_migrations",
+ "hmac",
+ "jwt",
  "rocket",
  "rocket_db_pools",
  "rocket_sync_db_pools",
  "serde_json",
+ "sha2",
  "sqlx",
 ]
 
@@ -2239,7 +2263,7 @@ version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c74cae0a4cf6ccbbf5f359f08efdf8ee7e1dc532573bf0db71968cb56b1448c"
 dependencies = [
- "base64",
+ "base64 0.21.7",
 ]
 
 [[package]]
@@ -2576,7 +2600,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "864b869fdf56263f4c95c45483191ea0af340f9f3e3e7b4d57a61c7c87a970db"
 dependencies = [
  "atoi",
- "base64",
+ "base64 0.21.7",
  "bitflags 2.9.1",
  "byteorder",
  "bytes",
@@ -2618,7 +2642,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eb7ae0e6a97fb3ba33b23ac2671a5ce6e3cabe003f451abd5a56e7951d975624"
 dependencies = [
  "atoi",
- "base64",
+ "base64 0.21.7",
  "bitflags 2.9.1",
  "byteorder",
  "crc",

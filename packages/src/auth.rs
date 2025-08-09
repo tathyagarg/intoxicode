@@ -3,6 +3,11 @@ use rocket::serde::json::Json;
 use rocket::serde::{self, Deserialize, Serialize};
 use serde_json::json;
 
+use hmac::{Hmac, Mac};
+use jwt::{AlgorithmType, Header, SignWithKey, Token, VerifyWithKey};
+use sha2::Sha384;
+use std::collections::BTreeMap;
+
 use argon2::{
     Argon2,
     password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
@@ -13,6 +18,8 @@ use diesel::prelude::*;
 use crate::database::PackagesDb;
 
 type Result<T, E = rocket::response::Debug<rocket::http::Status>> = std::result::Result<T, E>;
+
+const DEFAULT_TOKEN_EXPIRATION_SECS: u64 = 60 * 60;
 
 #[derive(Serialize, Deserialize, Insertable, Clone, Queryable, Debug)]
 #[serde(crate = "rocket::serde")]
@@ -70,12 +77,15 @@ pub async fn signup(
         ));
     }
 
+    let token = issue_jwt(user.username.clone(), DEFAULT_TOKEN_EXPIRATION_SECS);
+
     Ok(status::Custom(
         rocket::http::Status::Created,
         content::RawJson(
             serde::json::to_string(&json!({
                 "message": "User created successfully",
                 "username": user.username,
+                "token": token,
             }))
             .unwrap_or_else(|_| "{\"error\": \"Serialization error\"}".to_string()),
         ),
@@ -118,12 +128,15 @@ pub async fn login(
         .verify_password(password.as_bytes(), &parsed_hash)
         .is_ok()
     {
+        let token = issue_jwt(user_record.username.clone(), DEFAULT_TOKEN_EXPIRATION_SECS);
+
         Ok(status::Custom(
             rocket::http::Status::Ok,
             content::RawJson(
                 serde_json::to_string(&json!({
                     "message": "Login successful",
                     "username": user_record.username,
+                    "token": token,
                 }))
                 .unwrap_or_else(|_| "{\"error\": \"Serialization error\"}".to_string()),
             ),
@@ -139,4 +152,64 @@ pub async fn login(
             ),
         ))
     }
+}
+
+fn get_key() -> Hmac<Sha384> {
+    Hmac::new_from_slice(b"secret_key").expect("Failed to create HMAC key")
+}
+
+pub fn issue_jwt(username: String, expiration: u64) -> String {
+    let key = get_key();
+
+    let mut claims = BTreeMap::new();
+    claims.insert("sub", username);
+    claims.insert(
+        "exp",
+        (std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs()
+            + expiration)
+            .to_string(),
+    );
+
+    let header = Header {
+        algorithm: AlgorithmType::Hs384,
+        ..Default::default()
+    };
+
+    let token = Token::new(header, claims).sign_with_key(&key).unwrap();
+
+    token.as_str().to_string()
+}
+
+pub fn verify_jwt(token_str: &String) -> Result<String> {
+    let key = get_key();
+
+    let token_result = token_str.as_str().verify_with_key(&key);
+
+    if token_result.is_err() {
+        return Err(rocket::response::Debug(rocket::http::Status::Unauthorized));
+    }
+
+    let token: Token<Header, BTreeMap<String, String>, _> = token_result.unwrap();
+
+    let claims = token.claims();
+    let sub = claims.get("sub").cloned().unwrap_or_default();
+
+    let exp = claims
+        .get("exp")
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(0);
+
+    let current_time = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    if exp < current_time {
+        return Err(rocket::response::Debug(rocket::http::Status::Unauthorized));
+    }
+
+    Ok(sub)
 }
