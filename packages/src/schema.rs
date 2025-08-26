@@ -1,12 +1,12 @@
 // @generated automatically by Diesel CLI.
 
 diesel::table! {
-    packages (rowid) {
-        rowid -> Integer,
+    packages (name, version) {
         name -> Text,
         version -> Text,
         description -> Nullable<Text>,
         author -> Nullable<Text>,
+        time_created -> Nullable<Timestamp>,
     }
 }
 

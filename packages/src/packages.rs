@@ -1,8 +1,21 @@
+use rocket::serde::json::Json;
+use std::fs::File;
+
+use diesel::result::DatabaseErrorKind;
+use rocket::form::{Form, FromForm};
+use rocket::fs::TempFile;
 use rocket::http::CookieJar;
 use rocket::response::{content, status};
-use rocket::serde::json::Json;
 use rocket::serde::{self, Deserialize, Serialize};
 
+use tar::Archive;
+// use async_tar::Archive;
+// use tokio::io::BufReader;
+use flate2::read::GzDecoder;
+use std::io::BufReader;
+use tokio::task;
+
+use chrono::NaiveDateTime;
 use diesel::prelude::*;
 
 use crate::auth::verify_jwt;
@@ -18,9 +31,10 @@ struct Package {
     version: String,
     description: String,
     author: Option<String>,
+    timestamp: Option<NaiveDateTime>,
 }
 
-#[derive(Deserialize, Serialize, Insertable)]
+#[derive(Deserialize, Serialize, Insertable, Clone)]
 #[serde(crate = "rocket::serde")]
 #[diesel(table_name = packages)]
 pub struct PackageInsert {
@@ -35,6 +49,7 @@ table! {
         version -> Text,
         description -> Text,
         author -> Nullable<Text>,
+        timestamp -> Nullable<Timestamp>,
     }
 }
 
@@ -76,17 +91,16 @@ pub async fn get_packages(
     ))
 }
 
-#[derive(Deserialize, Serialize)]
-#[serde(crate = "rocket::serde")]
-pub struct CreatePackageData {
-    token: String,
-    package_data: PackageInsert,
+#[derive(FromForm)]
+pub struct UploadForm<'r> {
+    json: Json<PackageInsert>,
+    file: TempFile<'r>,
 }
 
-#[post("/packages", data = "<package_data>")]
+#[post("/packages", data = "<form>")]
 pub async fn create_package(
     db: PackagesDb,
-    package_data: Json<PackageInsert>,
+    mut form: Form<UploadForm<'_>>,
     cookies: &CookieJar<'_>,
 ) -> Result<status::Custom<content::RawJson<String>>> {
     let token = cookies
@@ -105,22 +119,91 @@ pub async fn create_package(
 
     let author_username = verification_result.unwrap();
 
+    let package_data: PackageInsert =
+        <rocket::serde::json::Json<PackageInsert> as Clone>::clone(&form.json).into_inner();
+
+    if package_data.version.chars().next() != Some('v') {
+        return Ok(status::Custom(
+            rocket::http::Status::BadRequest,
+            content::RawJson("{\"error\": \"Version must start with 'v'\"}".to_string()),
+        ));
+    }
+
     let package = Package {
         name: package_data.name.clone(),
         version: package_data.version.clone(),
         description: package_data.description.clone(),
         author: Some(author_username.clone()),
+        timestamp: None,
     };
+
+    let fp = format!(
+        "packages/{}-{}.tar.gz",
+        package_data.name, package_data.version
+    );
+
+    if let Err(_) = form.file.persist_to(fp.clone()).await {
+        return Err(rocket::response::Debug(
+            rocket::http::Status::InternalServerError,
+        ));
+    }
+
+    if let Err(e) = verify_tarball(fp.clone()).await {
+        println!("Error verifying tarball: {:?}", e);
+        let _ = std::fs::remove_file(fp);
+
+        return Err(e);
+    }
 
     let res = db
         .run(move |conn| {
-            diesel::insert_into(packages::table)
-                .values(&package)
-                .execute(conn)
+            conn.transaction(|conn| {
+                let res = diesel::insert_into(packages::table)
+                    .values(&package)
+                    .execute(conn);
+
+                if res.is_err() {
+                    match res.err().unwrap() {
+                        diesel::result::Error::DatabaseError(err_type, _) => match err_type {
+                            DatabaseErrorKind::UniqueViolation => {
+                                return Err(diesel::result::Error::DatabaseError(
+                                    DatabaseErrorKind::UniqueViolation,
+                                    Box::new(
+                                        "Package with this name and version already exists"
+                                            .to_string(),
+                                    ),
+                                ));
+                            }
+                            _ => {
+                                println!("Database error: {:?}", err_type);
+                                return Err(diesel::result::Error::RollbackTransaction);
+                            }
+                        },
+                        err => {
+                            println!("Error inserting package: {:?}", err);
+                            return Err(diesel::result::Error::RollbackTransaction);
+                        }
+                    }
+                }
+
+                Ok(())
+            })
         })
         .await;
 
-    if res.is_err() {
+    if let Err(e) = res {
+        let _ = std::fs::remove_file(fp);
+
+        if let diesel::result::Error::DatabaseError(DatabaseErrorKind::UniqueViolation, _) = e {
+            return Ok(status::Custom(
+                rocket::http::Status::Conflict,
+                content::RawJson(
+                    "{\"error\": \"Package with this name and version already exists\"}"
+                        .to_string(),
+                ),
+            ));
+        }
+
         return Err(rocket::response::Debug(
             rocket::http::Status::InternalServerError,
         ));
@@ -130,4 +213,13 @@ pub async fn create_package(
         rocket::http::Status::Created,
         content::RawJson("{\"message\": \"Package created successfully\"}".to_string()),
     ))
+}
+
+async fn verify_tarball(path: String) -> Result<(), rocket::response::Debug<rocket::http::Status>> {
+    // just check if path ends with .tar.gz
+    if !path.ends_with(".tar.gz") {
+        return Err(rocket::response::Debug(rocket::http::Status::BadRequest));
+    }
+
+    Ok(())
 }
