@@ -1,3 +1,0 @@
-ALTER TABLE packages
-ADD COLUMN author VARCHAR(50) REFERENCES users(username)
-ON DELETE SET NULL;
