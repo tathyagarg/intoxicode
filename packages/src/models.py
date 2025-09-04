@@ -9,7 +9,7 @@ class User(Model):
         database = db
 
 class Package(Model):
-    name = CharField(unique=True)
+    name = CharField()
     version = CharField()
     description = CharField(null=True)
 
