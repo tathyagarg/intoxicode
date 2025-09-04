@@ -1,8 +1,10 @@
-devlogs
+db
 bin
-.DS_Store
+devlogs
 releases
-.env
+packages/packages
 __pycache__
-*.db
-packages
+
+.env
+
+.DS_Store

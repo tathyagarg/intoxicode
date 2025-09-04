@@ -1,0 +1,206 @@
+from json import loads
+import os
+
+from sanic import json, Blueprint
+from sanic.response import file_stream
+from sanic_ext import openapi
+
+from .models import Package 
+from .utils import is_valid_tar_gz
+
+blueprint = Blueprint('Packages', url_prefix='/packages')
+
+@blueprint.post("/create")
+@openapi.definition(
+    body={
+        "multipart/form-data": {
+            "type": "object",
+            "properties": {
+                "json": {
+                    "type": "string",
+                    "description": "JSON string containing package metadata",
+                    "example": '{"name": "mypackage", "version": "1.0.0", "description": "A sample package"}'
+                },
+                "package": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The package file in tar.gz format"
+                }
+            },
+            "required": ["json", "package"]
+        }
+    },
+    description="Create a new package",
+    summary="Upload a new package",
+    response=[
+        {
+            "status": 201,
+            "description": "Package created successfully",
+            "content": {
+                "application/json": {
+                    "type": "object",
+                    "properties": {
+                        "message": {"type": "string", "example": "Package created"}
+                    }
+                }
+            }
+        },
+        {
+            "status": 400,
+            "description": "Bad request - missing fields or invalid file",
+            "content": {
+                "application/json": {
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string", "example": "Invalid JSON"},
+                        "code": {"type": "integer", "example": 400}
+                    }
+                }
+            }
+        },
+        {
+            "status": 401,
+            "description": "Unauthorized - authentication required",
+            "content": {
+                "application/json": {
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string", "example": "Authentication required"},
+                        "code": {"type": "integer", "example": 401}
+                    }
+                }
+            }
+        },
+        {
+            "status": 403,
+            "description": "Forbidden - permission denied",
+            "content": {
+                "application/json": {
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string", "example": "You do not have permission to update this package"},
+                        "code": {"type": "integer", "example": 403}
+                    }
+                }
+            }
+        },
+        {
+            "status": 409,
+            "description": "Conflict - package already exists",
+            "content": {
+                "application/json": {
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string", "example": "Package with this name and version already exists"},
+                        "code": {"type": "integer", "example": 409}
+                    }
+                }
+            }
+        }
+    ],
+    secured={"apiKey": []}
+)
+async def create_package(request):
+    data = loads(request.form.get('json'))
+    if not data:
+        return json({"error": "Invalid JSON"}, status=400)
+
+    file = request.files.get('package')
+    if not file:
+        return json({"error": "Package file is required"}, status=400)
+
+    if len(file.body) > 50 * 1024 * 1024:
+        return json({"error": "Package file is too large"}, status=400)
+
+    name = data.get('name')
+    version = data.get('version')
+    description = data.get('description', '')
+
+    if not name or not version:
+        return json({"error": "Name and version are required"}, status=400)
+
+    if not request.ctx.user:
+        return json({"error": "Authentication required"}, status=401)
+
+    existing_package = Package.get_or_none((Package.name == name) & (Package.version == version))
+    if existing_package:
+        return json({"error": "Package with this name and version already exists"}, status=409)
+
+    package_line = Package.get_or_none(Package.name == name)
+    if package_line and package_line.author != request.ctx.user:
+        return json({"error": "You do not have permission to update this package"}, status=403)
+
+    file_path = f'packages/{name}_{version}.tar.gz'
+
+    with open(file_path, 'wb') as f:
+        f.write(file.body)
+
+    if not is_valid_tar_gz(file_path):
+        os.remove(file_path)
+        return json({"error": "Invalid tar.gz file"}, status=400)
+
+    _ = Package.create(
+        name=name,
+        version=version,
+        description=description,
+        author=request.ctx.user
+    )
+
+    return json({"message": "Package created"}, status=201)
+
+@blueprint.get("/download/<name>/<version>")
+@openapi.definition(
+    description="Download a package by name and version",
+    summary="Download package",
+    parameter=[
+        {
+            "name": "name",
+            "in": "path",
+            "required": True,
+            "description": "The name of the package to download"
+        },
+        {
+            "name": "version",
+            "in": "path",
+            "required": True,
+            "description": "The version of the package to download"
+        }
+    ],
+    response=[
+        {
+            "status": 200,
+            "description": "Package file",
+            "content": {
+                "application/gzip": {
+                    "schema": {
+                        "type": "string",
+                        "format": "binary"
+                    }
+                }
+            }
+        },
+        {
+            "status": 404,
+            "description": "Package not found",
+            "content": {
+                "application/json": {
+                    "type": "object",
+                    "properties": {
+                        "error": {"type": "string", "example": "Package not found"},
+                        "code": {"type": "integer", "example": 404}
+                    }
+                }
+            }
+        }
+    ]
+)
+async def download_package(_, name, version):
+    package = Package.get_or_none((Package.name == name) & (Package.version == version))
+    if not package:
+        return json({"error": "Package not found"}, status=404)
+
+    file_path = f'packages/{name}_{version}.tar.gz'
+    if not os.path.exists(file_path):
+        return json({"error": "Package file not found"}, status=404)
+
+    return await file_stream(file_path, mime_type='application/gzip', filename=f'{name}-{version}.tar.gz')
