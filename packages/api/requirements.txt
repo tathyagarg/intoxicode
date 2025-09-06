@@ -1,8 +1,10 @@
 aiofiles==24.1.0
+bcrypt==4.3.0
 html5tagger==1.3.0
 httptools==0.6.4
 multidict==6.6.4
 peewee==3.18.2
+PyJWT==2.10.1
 python-dotenv==1.1.1
 PyYAML==6.0.2
 sanic==25.3.0

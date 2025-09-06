@@ -1,4 +1,4 @@
-from peewee import ForeignKeyField, Model, CharField
+from peewee import ForeignKeyField, IntegerField, Model, CharField
 from .database import db
 
 class User(Model):
@@ -11,6 +11,11 @@ class User(Model):
 class Package(Model):
     name = CharField()
     version = CharField()
+
+    major = IntegerField()
+    minor = IntegerField()
+    patch = IntegerField()
+
     description = CharField(null=True)
 
     author = ForeignKeyField(User, backref='packages')

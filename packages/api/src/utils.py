@@ -1,3 +1,4 @@
+import re
 import time
 import gzip
 import tarfile
@@ -31,3 +32,6 @@ def is_valid_tar_gz(file_path: str) -> bool:
     except (tarfile.TarError, OSError) as e:
         print(f"Error validating tar.gz file: {e}")
         return False
+
+def is_valid_version(version: str) -> bool:
+    return bool(re.match(r'v\d+\.\d+\.\d+', version))

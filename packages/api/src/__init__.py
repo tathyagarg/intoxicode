@@ -54,8 +54,6 @@ async def close_db(*_):
 
 @app.get("/")
 async def index(request):
-    print(request.ctx.user)
-
     return text("Welcome to Intoxicode Packages!")
 
 

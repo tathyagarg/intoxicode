@@ -1,9 +1,12 @@
-db
 bin
 devlogs
 releases
-packages/packages
+
+db
+packages/api/packages
 __pycache__
+
+target
 
 .env
 
