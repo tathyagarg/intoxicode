@@ -1,5 +1,5 @@
+use std::io::Write;
 use std::path::Path;
-use std::{io::Write, pin::Pin};
 
 use clap::{Args, Parser, Subcommand};
 use futures::future::{BoxFuture, FutureExt};
@@ -59,50 +59,58 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let actual_version = &package_info.first().unwrap().version;
 
             install_dependency(api_root, install_args.package, actual_version.to_string()).await;
-
-            // let body = reqwest::get(format!(
-            //     "{}/packages/download/{}/{}",
-            //     api_root, install_args.package, install_args.version
-            // ))
-            // .await?
-            // .bytes()
-            // .await?;
-
-            // let fname = format!("deps/{}.tar.gz", install_args.package);
-
-            // std::fs::write(fname.clone(), &body)?;
-
-            // let tar_gz = std::fs::File::open(fname.clone())?;
-            // let decompressor = GzDecoder::new(tar_gz);
-            // let mut archive = Archive::new(decompressor);
-            // archive.unpack("deps")?;
-
-            // std::fs::remove_file(fname)?;
-
-            // let new_line = format!("{}:{}\n", install_args.package, actual_version);
-            // let manifest = Path::new("manifest.txt");
-
-            // if manifest.exists() {
-            //     let mut file = std::fs::OpenOptions::new()
-            //         .write(true)
-            //         .append(true)
-            //         .open(manifest)?;
-
-            //     writeln!(file, "{}", new_line.trim())?;
-            // } else {
-            //     std::fs::write(manifest, new_line)?;
-            // }
         }
-        Commands::Uninstall { package } => {}
+        Commands::Uninstall { package } => {
+            let dep_path = format!("deps/{}", package);
+            if Path::new(&dep_path).exists() {
+                std::fs::remove_dir_all(dep_path).unwrap();
+            }
+
+            let manifest = Path::new("manifest.txt");
+            if manifest.exists() {
+                let contents = std::fs::read_to_string(manifest).unwrap();
+                let new_contents: String = contents
+                    .lines()
+                    .filter(|line| !line.starts_with(&package))
+                    .map(|line| format!("{}\n", line))
+                    .collect();
+                std::fs::write(manifest, new_contents).unwrap();
+            }
+        }
         Commands::List { include_versions } => {
             if include_versions {
                 println!("Listing all packages with versions...");
+                let manifest = Path::new("manifest.txt");
+                if manifest.exists() {
+                    let contents = std::fs::read_to_string(manifest).unwrap();
+                    for line in contents.lines() {
+                        println!("{}", line);
+                    }
+                }
             } else {
                 println!("Listing all packages...");
+                let manifest = Path::new("manifest.txt");
+                if manifest.exists() {
+                    let contents = std::fs::read_to_string(manifest).unwrap();
+                    for line in contents.lines() {
+                        let package_name = line.split(':').next().unwrap();
+                        println!("{}", package_name);
+                    }
+                }
             }
         }
         Commands::Deps {} => {
-            println!("Installing all dependencies in manifest.txt...")
+            println!("Installing all dependencies in manifest.txt...");
+            let manifest = Path::new("manifest.txt");
+            if manifest.exists() {
+                let contents = std::fs::read_to_string(manifest).unwrap();
+                for line in contents.lines() {
+                    let mut parts = line.split(':');
+                    let dep_name = parts.next().unwrap().to_string();
+                    let dep_version = parts.next().unwrap().to_string();
+                    install_dependency(api_root.clone(), dep_name, dep_version).await;
+                }
+            }
         }
     }
 
