@@ -15,6 +15,7 @@
   "devDependencies": {
     "@catppuccin/tailwindcss": "^0.1.6",
     "@sveltejs/adapter-node": "^5.2.12",
+    "@sveltejs/adapter-vercel": "^7.0.0",
     "@sveltejs/kit": "^2.16.0",
     "@sveltejs/vite-plugin-svelte": "^5.0.0",
     "@tailwindcss/typography": "^0.5.15",
